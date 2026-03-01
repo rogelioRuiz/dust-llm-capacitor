@@ -1,0 +1,61 @@
+{
+  "name": "@dust/llm-capacitor",
+  "version": "0.1.0",
+  "description": "Capacitor plugin for on-device llama.cpp model loading over GGUF files.",
+  "main": "dist/esm/index.js",
+  "types": "dist/esm/index.d.ts",
+  "type": "module",
+  "author": "Techxagon",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rogelioRuiz/dust-llm-capacitor.git"
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "clean": "rm -rf dist",
+    "lint": "biome check .",
+    "lint:fix": "biome check --fix .",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    },
+    "android": {
+      "src": "android"
+    }
+  },
+  "files": [
+    "dist/esm/",
+    "android/src/main/",
+    "android/build.gradle",
+    "ios/Sources/",
+    "DustCapacitorLlm.podspec",
+    "Package.swift",
+    ".gitmodules"
+  ],
+  "keywords": [
+    "capacitor",
+    "plugin",
+    "llama.cpp",
+    "gguf",
+    "llm",
+    "inference"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@capacitor/core": "^7.0.0 || ^8.0.0",
+    "@dust/core-capacitor": ">=0.1.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.4",
+    "@capacitor/core": "^8.0.0",
+    "@dust/core-capacitor": "^0.1.0",
+    "typescript": "~5.7.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

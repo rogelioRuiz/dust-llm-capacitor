@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LLM Streaming Test</title>
+  <style>
+    body { font-family: monospace; background: #0d0d0d; color: #e0e0e0; padding: 16px; font-size: 13px; margin: 0; }
+    h1 { color: #7c3aed; margin-bottom: 4px; font-size: 18px; }
+    .subtitle { color: #666; margin-bottom: 16px; font-size: 11px; }
+    #status { color: #888; margin-bottom: 12px; font-size: 12px; padding: 8px; background: #111; border-radius: 4px; }
+    .test { margin: 3px 0; padding: 6px 10px; border-radius: 4px; display: flex; align-items: flex-start; gap: 8px; }
+    .test.pass { background: #0a2a0a; border-left: 3px solid #22c55e; }
+    .test.fail { background: #2a0a0a; border-left: 3px solid #ef4444; }
+    .test.running { background: #1a1a0a; border-left: 3px solid #eab308; }
+    .test.pending { background: #1a1a1a; border-left: 3px solid #333; }
+    .badge { font-weight: bold; min-width: 56px; flex-shrink: 0; font-size: 11px; }
+    .pass .badge { color: #22c55e; }
+    .fail .badge { color: #ef4444; }
+    .running .badge { color: #eab308; }
+    .pending .badge { color: #555; }
+    .detail { color: #888; font-size: 11px; margin-top: 2px; word-break: break-all; }
+    #summary { margin-top: 16px; padding: 10px; border-radius: 6px; background: #111; font-size: 14px; }
+    #plugins { color: #22c55e; font-size: 11px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <h1>capacitor-llm</h1>
+  <div class="subtitle">E2E Streaming Test</div>
+  <div id="status">Waiting for Capacitor bridge...</div>
+  <div id="tests"></div>
+  <div id="summary"></div>
+  <div id="plugins"></div>
+
+  <script src="capacitor.js"></script>
+  <script>
+  (async function () {
+    const RUNNER_URL = 'http://127.0.0.1:8099'
+    const MODEL_PATH = '/data/local/tmp/tinyllama-1.1b-chat-v1.0.Q2_K.gguf'
+
+    async function postResult(id, status, detail, error) {
+      try {
+        await fetch(RUNNER_URL + '/__llm_result', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, status, detail, error }),
+          keepalive: true
+        })
+      } catch (e) {}
+      var safeId = 'test-' + id.replace(/[^a-zA-Z0-9]/g, '_')
+      var el = document.getElementById(safeId)
+      if (el) {
+        el.className = 'test ' + (status === 'pass' ? 'pass' : 'fail')
+        el.querySelector('.badge').textContent = status === 'pass' ? 'PASS' : 'FAIL'
+        if (detail || error) el.querySelector('.detail').textContent = detail || error
+      }
+    }
+
+    async function postDone(passed, failed, total) {
+      try {
+        await fetch(RUNNER_URL + '/__llm_done', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ passed, failed, total }),
+          keepalive: true
+        })
+      } catch (e) {}
+    }
+
+    function renderTest(name) {
+      var safeId = 'test-' + name.replace(/[^a-zA-Z0-9]/g, '_')
+      if (!document.getElementById(safeId)) {
+        var div = document.createElement('div')
+        div.id = safeId
+        div.className = 'test pending'
+        div.innerHTML = '<span class="badge">  ---</span><div><div>' + name + '</div><div class="detail"></div></div>'
+        document.getElementById('tests').appendChild(div)
+      }
+    }
+
+    function setStatus(msg) {
+      document.getElementById('status').textContent = msg
+    }
+
+    // Wait for Capacitor bridge
+    setStatus('Waiting for Capacitor bridge...')
+    var LLM
+    for (var i = 0; i < 50; i++) {
+      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LLM) {
+        LLM = window.Capacitor.Plugins.LLM
+        break
+      }
+      await new Promise(function(r) { setTimeout(r, 200) })
+    }
+    if (!LLM) {
+      setStatus('ERROR: LLM plugin not found after 10s')
+      console.error('__LLM_BRIDGE_TIMEOUT__')
+      return
+    }
+
+    console.log('__LLM_BRIDGE_READY__')
+    document.getElementById('plugins').textContent =
+      'Plugins: ' + Object.keys(window.Capacitor.Plugins).join(', ')
+    setStatus('Bridge ready. Running tests...')
+
+    var passed = 0, failed = 0, total = 0
+    async function t(name, fn, timeoutMs) {
+      total++
+      renderTest(name)
+      var safeId = 'test-' + name.replace(/[^a-zA-Z0-9]/g, '_')
+      var el = document.getElementById(safeId)
+      if (el) { el.className = 'test running'; el.querySelector('.badge').textContent = '... RUN' }
+      var t0 = Date.now()
+      var limit = timeoutMs || 120000
+      try {
+        await Promise.race([
+          fn(),
+          new Promise(function(_, rej) { setTimeout(function() { rej(new Error('Timed out after ' + limit + 'ms')) }, limit) })
+        ])
+        passed++
+        await postResult(name, 'pass', (Date.now() - t0) + 'ms')
+      } catch (e) {
+        failed++
+        await postResult(name, 'fail', null, e.message.split('\n')[0])
+      }
+    }
+
+    function assert(c, m) { if (!c) throw new Error('Assertion failed: ' + m) }
+    function eq(a, e, m) {
+      if (a !== e) throw new Error(m + ': expected ' + JSON.stringify(e) + ', got ' + JSON.stringify(a))
+    }
+
+    var modelId = null
+
+    // ── Test 1: Load Model ────────────────────────────────────────────────
+    await t('1.1 loadModel from /sdcard', async function() {
+      var result = await LLM.loadModel({
+        descriptor: { id: 'tinyllama', format: 'gguf', url: MODEL_PATH },
+        config: { contextSize: 512, nGpuLayers: 0 }
+      })
+      modelId = result.modelId
+      assert(modelId, 'modelId must be set')
+      assert(result.metadata, 'metadata must exist')
+      assert(result.metadata.name, 'name: ' + result.metadata.name)
+    }, 60000)
+
+    if (!modelId) {
+      setStatus('FATAL: Model failed to load. Cannot run streaming tests.')
+      await postDone(passed, failed, total)
+      return
+    }
+
+    // ── Test 2: Tokenize ──────────────────────────────────────────────────
+    await t('1.2 tokenize returns tokens', async function() {
+      var r = await LLM.tokenize({ modelId: modelId, text: 'Hello world' })
+      assert(Array.isArray(r.tokens), 'tokens must be array')
+      assert(r.tokens.length > 0, 'tokens must not be empty, got ' + r.tokens.length)
+    })
+
+    // ── Test 3: Single-shot generate ──────────────────────────────────────
+    await t('1.3 generate single-shot', async function() {
+      var result = await LLM.generate({
+        modelId: modelId,
+        prompt: 'The capital of France is',
+        maxTokens: 5,
+        sampler: { temperature: 0.1, seed: 42 }
+      })
+      assert(result.text.length > 0, 'text must not be empty')
+      assert(result.tokenCount > 0, 'tokenCount: ' + result.tokenCount)
+      assert(result.stopReason === 'max_tokens' || result.stopReason === 'eos',
+        'stopReason: ' + result.stopReason)
+    }, 120000)
+
+    // ── Test 4: Stream generate — tokens arrive incrementally ─────────────
+    await t('2.1 streamGenerate tokens arrive incrementally', async function() {
+      var tokenTimestamps = []
+      var tokens = []
+
+      await new Promise(async function(resolve, reject) {
+        var tokenListener = await LLM.addListener('inferenceToken', function(event) {
+          if (event.modelId !== modelId) return
+          tokenTimestamps.push(Date.now())
+          tokens.push(event.token)
+        })
+
+        var completeListener = await LLM.addListener('inferenceComplete', function(event) {
+          if (event.modelId !== modelId) return
+          tokenListener.remove()
+          completeListener.remove()
+          failedListener.remove()
+          resolve()
+        })
+
+        var failedListener = await LLM.addListener('inferenceFailed', function(event) {
+          if (event.modelId !== modelId) return
+          tokenListener.remove()
+          completeListener.remove()
+          failedListener.remove()
+          reject(new Error(event.error))
+        })
+
+        LLM.streamGenerate({
+          modelId: modelId,
+          prompt: 'Once upon a time there was a little',
+          maxTokens: 10,
+          sampler: { temperature: 0.1, seed: 42 }
+        })
+      })
+
+      assert(tokens.length > 0, 'must receive tokens, got 0')
+
+      // Key check: tokens must arrive over TIME, not all at once.
+      if (tokenTimestamps.length >= 3) {
+        var firstTs = tokenTimestamps[0]
+        var lastTs = tokenTimestamps[tokenTimestamps.length - 1]
+        var totalSpan = lastTs - firstTs
+        // With true streaming, tokens should span at least ~20ms total.
+        // Post-hoc shim would deliver all tokens within <5ms.
+        assert(totalSpan > 20,
+          'Token delivery span must be >20ms for true streaming, got ' + totalSpan + 'ms over ' + tokenTimestamps.length + ' tokens')
+      }
+    }, 120000)
+
+    // ── Test 5: Stream generate — tokensPerSecond is realistic ─────────────
+    await t('2.2 streamGenerate reports realistic tokensPerSecond', async function() {
+      var completionEvent = null
+
+      await new Promise(async function(resolve, reject) {
+        var completeListener = await LLM.addListener('inferenceComplete', function(event) {
+          if (event.modelId !== modelId) return
+          completionEvent = event
+          completeListener.remove()
+          failedListener.remove()
+          resolve()
+        })
+
+        var failedListener = await LLM.addListener('inferenceFailed', function(event) {
+          if (event.modelId !== modelId) return
+          completeListener.remove()
+          failedListener.remove()
+          reject(new Error(event.error))
+        })
+
+        LLM.streamGenerate({
+          modelId: modelId,
+          prompt: 'The meaning of life is',
+          maxTokens: 5,
+          sampler: { temperature: 0.1, seed: 123 }
+        })
+      })
+
+      assert(completionEvent, 'must get inferenceComplete')
+      assert(completionEvent.completionTokens > 0, 'completionTokens: ' + completionEvent.completionTokens)
+      assert(completionEvent.tokensPerSecond > 0, 'tps: ' + completionEvent.tokensPerSecond)
+      assert(completionEvent.text.length > 0, 'text must not be empty')
+      // Sanity: tps should be between 0.01 and 500 for a real device
+      assert(completionEvent.tokensPerSecond > 0.01 && completionEvent.tokensPerSecond < 500,
+        'tps unrealistic: ' + completionEvent.tokensPerSecond)
+    }, 120000)
+
+    // ── Test 6: Cancel mid-stream ─────────────────────────────────────────
+    await t('2.3 cancelGeneration stops stream promptly', async function() {
+      var tokensBefore = []
+      var stopReason = null
+      var cancelAfterN = 5 // Cancel after receiving 5 tokens
+
+      await new Promise(async function(resolve, reject) {
+        var tokenListener = await LLM.addListener('inferenceToken', function(event) {
+          if (event.modelId !== modelId) return
+          tokensBefore.push(event.token)
+          if (tokensBefore.length === cancelAfterN) {
+            LLM.cancelGeneration({ modelId: modelId })
+          }
+        })
+
+        var completeListener = await LLM.addListener('inferenceComplete', function(event) {
+          if (event.modelId !== modelId) return
+          stopReason = event.stopReason
+          tokenListener.remove()
+          completeListener.remove()
+          failedListener.remove()
+          resolve()
+        })
+
+        var failedListener = await LLM.addListener('inferenceFailed', function(event) {
+          if (event.modelId !== modelId) return
+          tokenListener.remove()
+          completeListener.remove()
+          failedListener.remove()
+          reject(new Error(event.error))
+        })
+
+        LLM.streamGenerate({
+          modelId: modelId,
+          prompt: 'Write a very long essay about the history of mathematics from ancient times to modern day',
+          maxTokens: 100,
+          sampler: { temperature: 0.8, seed: 77 }
+        })
+      })
+
+      eq(stopReason, 'cancelled', 'stopReason must be cancelled')
+      // With true streaming + cancel, we should get close to cancelAfterN tokens,
+      // NOT all 100. Allow some slack since a few tokens may arrive before cancel takes effect.
+      assert(tokensBefore.length < cancelAfterN + 20,
+        'Got ' + tokensBefore.length + ' tokens after cancel at ' + cancelAfterN + ' — cancel must stop promptly')
+    }, 120000)
+
+    // ── Test 7: Stream with stop sequence ─────────────────────────────────
+    await t('2.4 streamGenerate stopSequence terminates', async function() {
+      var completionEvent = null
+
+      await new Promise(async function(resolve, reject) {
+        var completeListener = await LLM.addListener('inferenceComplete', function(event) {
+          if (event.modelId !== modelId) return
+          completionEvent = event
+          completeListener.remove()
+          failedListener.remove()
+          resolve()
+        })
+
+        var failedListener = await LLM.addListener('inferenceFailed', function(event) {
+          if (event.modelId !== modelId) return
+          completeListener.remove()
+          failedListener.remove()
+          reject(new Error(event.error))
+        })
+
+        LLM.streamGenerate({
+          modelId: modelId,
+          prompt: 'Count from 1 to 100: 1, 2, 3,',
+          maxTokens: 50,
+          stopSequences: ['10'],
+          sampler: { temperature: 0.1, seed: 42 }
+        })
+      })
+
+      assert(completionEvent, 'must get inferenceComplete')
+      // Stop sequence should trigger before reaching maxTokens
+      assert(completionEvent.completionTokens < 50,
+        'must stop before maxTokens, got ' + completionEvent.completionTokens)
+    }, 120000)
+
+    // ── Test 8: Unload model ──────────────────────────────────────────────
+    await t('3.1 unloadModel succeeds', async function() {
+      await LLM.unloadModel({ modelId: modelId })
+      var r = await LLM.listLoadedModels()
+      assert(!r.modelIds.includes(modelId), 'model must be unloaded')
+    })
+
+    // ── Done ──────────────────────────────────────────────────────────────
+    var color = failed === 0 ? '#22c55e' : '#ef4444'
+    document.getElementById('summary').innerHTML =
+      '<span style="color:' + color + ';font-weight:bold">' + passed + '/' + total +
+      (failed > 0 ? ' passed — ' + failed + ' FAILED' : ' passed — ALL PASS') + '</span>'
+    setStatus('Done: ' + passed + '/' + total + ' passed')
+
+    await LLM.removeAllListeners()
+    await postDone(passed, failed, total)
+
+  })().catch(async function(err) {
+    document.getElementById('status').textContent = 'Fatal error: ' + err.message
+    console.error('E2E fatal:', err)
+    try {
+      await fetch('http://127.0.0.1:8099/__llm_result', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: 'FATAL', status: 'fail', error: err.message }),
+        keepalive: true
+      })
+      await fetch('http://127.0.0.1:8099/__llm_done', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passed: 0, failed: 1, total: 1, fatal: err.message }),
+        keepalive: true
+      })
+    } catch (e) {}
+  })
+  </script>
+</body>
+</html>
