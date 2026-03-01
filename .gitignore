@@ -17,3 +17,8 @@ example/android/app/build/
 examples/
 *.gguf
 test/models/
+**/build/
+**/.gradle/
+**/.cxx/
+**/.kotlin/
+**/__pycache__/
