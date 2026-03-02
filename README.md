@@ -51,6 +51,25 @@ Capacitor plugin for on-device LLM inference via [llama.cpp](https://github.com/
 
 This is the **Capacitor bridge layer** — it translates JavaScript API calls into native calls on [dust-llm-swift](https://github.com/rogelioRuiz/dust-llm-swift) (iOS) and [dust-llm-kotlin](https://github.com/rogelioRuiz/dust-llm-kotlin) (Android), which contain all model loading, inference, and session management logic.
 
+## Demo
+
+<table>
+  <tr>
+    <th align="center">Android</th>
+    <th align="center">iOS</th>
+  </tr>
+  <tr>
+    <td>
+      <video src="android-qwen-e2e-clip.mp4" autoplay loop muted playsinline width="320"
+        aria-label="Qwen LLM on Android"></video>
+    </td>
+    <td>
+      <video src="ios-qwen-e2e-clip.mp4" autoplay loop muted playsinline width="320"
+        aria-label="Qwen LLM on iOS"></video>
+    </td>
+  </tr>
+</table>
+
 ## Install
 
 ```bash
