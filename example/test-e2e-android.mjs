@@ -1,41 +1,39 @@
 #!/usr/bin/env node
 /**
- * capacitor-llm Android E2E Test Suite
+ * LLM Chat — Android E2E Test Suite
  *
- * Verifies true per-token JNI streaming, cancel-mid-stream,
- * and basic load/unload on a real device.
+ * Runs the 14-test in-app suite (core LLM + interactive chat UI flow)
+ * on an Android device/emulator via HTTP result collection.
  *
- * Approach: HTTP server on localhost:8099 + ADB reverse port-forward.
- *   - `adb reverse tcp:8099 tcp:8099` maps device port 8099 → host port 8099
- *   - index.html POSTs __llm_result and __llm_done to this server
+ * Auto-setup: model download, cap add android, model push to device.
  *
  * Prerequisites:
- *   - Connected arm64 Android device or emulator
+ *   - Android SDK with ADB (device/emulator auto-started if available)
  *   - GGUF model auto-downloaded on first run
  *
  * Usage:
  *   node test-e2e-android.mjs
  */
 
-import { execSync } from 'child_process'
+import { execSync, spawn } from 'child_process'
+import fs from 'fs'
 import http from 'http'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import fs from 'fs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT_DIR = path.resolve(__dirname, '..')
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-const BUNDLE_ID   = 'io.t6x.llm.test'
-const RUNNER_PORT = 8099
-const TOTAL_TESTS = 8
-const TIMEOUT_MS  = 300_000  // 5 min — model loading is slow
-const ADB         = process.env.ADB_PATH || 'adb'
-const MODEL_NAME  = 'tinyllama-1.1b-chat-v1.0.Q2_K.gguf'
-const MODEL_URL   = 'https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q2_K.gguf'
-const MODEL_DIR   = path.join(ROOT_DIR, 'test/models')
-const MODEL_PATH  = path.join(MODEL_DIR, MODEL_NAME)
+const BUNDLE_ID         = 'io.t6x.llmchat'
+const RUNNER_PORT       = 8099
+const TOTAL_TESTS       = 14
+const TIMEOUT_MS        = 1_200_000  // 20 min — model loading is slow on emulator
+const ADB               = process.env.ADB_PATH || 'adb'
+const MODEL_NAME        = 'qwen2.5-1.5b-instruct-q4_k_m.gguf'
+const MODEL_URL         = 'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf'
+const MODEL_DIR         = path.join(ROOT_DIR, 'test/models')
+const LOCAL_MODEL_PATH  = path.join(MODEL_DIR, MODEL_NAME)
 const DEVICE_MODEL_PATH = `/data/local/tmp/${MODEL_NAME}`
 
 // ─── Test runner state ────────────────────────────────────────────────────────
@@ -54,10 +52,24 @@ function fail(name, error) {
   console.log(`  ❌ ${name} — ${error}`)
 }
 
-// ─── ADB helpers ──────────────────────────────────────────────────────────────
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
+
+// ─── Shell / ADB helpers ─────────────────────────────────────────────────────
+function run(cmd, opts = {}) {
+  const nodePath = execSync('which node', { encoding: 'utf8' }).trim()
+  return execSync(cmd, {
+    encoding: 'utf8',
+    timeout: 600_000,
+    maxBuffer: 50 * 1024 * 1024,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, PATH: `${path.dirname(nodePath)}:${process.env.PATH}` },
+    ...opts,
+  }).trim()
+}
+
 function adb(args, opts = {}) {
   const serial = process.env.ANDROID_SERIAL ? `-s ${process.env.ANDROID_SERIAL}` : ''
-  return execSync(`${ADB} ${serial} ${args}`, { encoding: 'utf8', timeout: 60000, ...opts }).trim()
+  return run(`${ADB} ${serial} ${args}`, { timeout: 60_000, ...opts })
 }
 
 function getConnectedDevice() {
@@ -67,31 +79,132 @@ function getConnectedDevice() {
   return lines[0].split('\t')[0].trim()
 }
 
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
+function findEmulatorBinary() {
+  // Try common locations
+  const candidates = [
+    process.env.ANDROID_HOME && path.join(process.env.ANDROID_HOME, 'emulator/emulator'),
+    process.env.ANDROID_SDK_ROOT && path.join(process.env.ANDROID_SDK_ROOT, 'emulator/emulator'),
+    path.join(process.env.HOME, 'Library/Android/sdk/emulator/emulator'),  // macOS default
+    path.join(process.env.HOME, 'Android/Sdk/emulator/emulator'),          // Linux default
+  ].filter(Boolean)
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p
+  }
+  try { return execSync('which emulator', { encoding: 'utf8' }).trim() } catch {}
+  return null
+}
+
+function getAvailableAVDs(emulatorBin) {
+  try {
+    const out = execSync(`${emulatorBin} -list-avds`, { encoding: 'utf8' }).trim()
+    return out.split('\n').filter(l => l.length > 0)
+  } catch { return [] }
+}
+
+function bootEmulator(emulatorBin, avdName) {
+  console.log(`  → Starting emulator (${avdName})...`)
+  const child = spawn(emulatorBin, ['-avd', avdName, '-no-window', '-no-audio', '-no-boot-anim'], {
+    detached: true,
+    stdio: 'ignore',
+  })
+  child.unref()
+
+  // Wait for device to appear in adb
+  for (let i = 0; i < 60; i++) {
+    execSync('sleep 2')
+    const serial = getConnectedDevice()
+    if (serial) {
+      // Wait for boot to complete
+      try {
+        const bootComplete = execSync(`${ADB} -s ${serial} shell getprop sys.boot_completed 2>/dev/null`, { encoding: 'utf8' }).trim()
+        if (bootComplete === '1') return serial
+      } catch {}
+    }
+  }
+  throw new Error('Emulator failed to boot within 120s')
+}
+
+function npx(args, opts = {}) {
+  const npmPath = execSync('which npm', { encoding: 'utf8' }).trim()
+  const npxPath = path.join(path.dirname(npmPath), 'npx')
+  return run(`${npxPath} ${args}`, opts)
+}
 
 // ─── Project setup (idempotent) ──────────────────────────────────────────────
 function ensureModel() {
-  if (fs.existsSync(MODEL_PATH)) return
-  console.log(`  → Downloading model (${MODEL_NAME})...`)
+  if (fs.existsSync(LOCAL_MODEL_PATH)) return
+  console.log(`  → Downloading model (${MODEL_NAME}, ~1.1 GB)...`)
   fs.mkdirSync(MODEL_DIR, { recursive: true })
-  execSync(`curl -L -o "${MODEL_PATH}" "${MODEL_URL}"`, {
-    stdio: ['ignore', 'pipe', 'pipe'],
+  execSync(`curl -L --progress-bar -o "${LOCAL_MODEL_PATH}" "${MODEL_URL}"`, {
+    stdio: ['ignore', process.stderr, 'pipe'],
     timeout: 600_000,
   })
 }
 
-function ensureCapSync() {
-  console.log('  → cap sync android...')
-  const nodePath = execSync('which node', { encoding: 'utf8' }).trim()
-  const npmPath = execSync('which npm', { encoding: 'utf8' }).trim()
-  const npxPath = path.join(path.dirname(npmPath), 'npx')
-  execSync(`${npxPath} cap sync android`, {
-    cwd: __dirname,
-    encoding: 'utf8',
-    timeout: 60000,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, PATH: `${path.dirname(nodePath)}:${process.env.PATH}` }
-  })
+function ensureAndroidProject() {
+  const androidDir = path.join(__dirname, 'android')
+  if (fs.existsSync(androidDir)) return
+  console.log('  → cap add android...')
+  npx('cap add android', { cwd: __dirname, stdio: ['ignore', 'pipe', 'pipe'], timeout: 60_000 })
+}
+
+function patchAndroidBuildGradle() {
+  // Capacitor generates build.gradle without Kotlin plugin classpath —
+  // our plugins (dust-core-capacitor, dust-llm-capacitor) need it
+  const buildGradle = path.join(__dirname, 'android/build.gradle')
+  if (!fs.existsSync(buildGradle)) return
+  let content = fs.readFileSync(buildGradle, 'utf8')
+  if (content.includes('kotlin-gradle-plugin')) return
+  content = content.replace(
+    /classpath 'com\.android\.tools\.build:gradle:[^']+'/,
+    match => `${match}\n        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.0'`
+  )
+  fs.writeFileSync(buildGradle, content)
+}
+
+function patchMinSdkVersion() {
+  // dust-llm-capacitor requires minSdk 26, Capacitor defaults to 24
+  const varsGradle = path.join(__dirname, 'android/variables.gradle')
+  if (!fs.existsSync(varsGradle)) return
+  let content = fs.readFileSync(varsGradle, 'utf8')
+  content = content.replace(/minSdkVersion = \d+/, 'minSdkVersion = 26')
+  fs.writeFileSync(varsGradle, content)
+}
+
+function patchAndroidManifest() {
+  // Allow cleartext HTTP for test result posting to localhost
+  const manifest = path.join(__dirname, 'android/app/src/main/AndroidManifest.xml')
+  if (!fs.existsSync(manifest)) return
+  let content = fs.readFileSync(manifest, 'utf8')
+  if (content.includes('usesCleartextTraffic')) return
+  content = content.replace(
+    '<application',
+    '<application\n        android:usesCleartextTraffic="true"'
+  )
+  fs.writeFileSync(manifest, content)
+}
+
+function patchWebIndexForTestMode() {
+  const webIndexPath = path.join(__dirname, 'www/index.html')
+  const androidAssetPath = path.join(
+    __dirname,
+    'android/app/src/main/assets/public/index.html',
+  )
+  const original = fs.readFileSync(webIndexPath, 'utf8')
+
+  if (!/var TEST_MODE = (true|false)/.test(original)) {
+    throw new Error('Could not find TEST_MODE flag in www/index.html')
+  }
+
+  const patched = original.replace(/var TEST_MODE = (true|false)/, 'var TEST_MODE = true')
+  fs.writeFileSync(webIndexPath, patched)
+
+  return function restore() {
+    fs.writeFileSync(webIndexPath, original)
+    if (fs.existsSync(androidAssetPath)) {
+      fs.writeFileSync(androidAssetPath, original)
+    }
+  }
 }
 
 // ─── HTTP result collector ────────────────────────────────────────────────────
@@ -159,74 +272,84 @@ function startResultServer() {
 //  MAIN
 // ═════════════════════════════════════════════════════════════════════════════
 async function main() {
-  console.log('\n🟢 capacitor-llm Android E2E Test Suite\n')
+  console.log('\n🟢 LLM Chat Android E2E Test Suite\n')
 
   // ─── Section 0: Project Setup ──────────────────────────────────────────
   logSection('0 — Project Setup')
 
   try {
     ensureModel()
-    pass('0.1 Model available', `${Math.round(fs.statSync(MODEL_PATH).size / 1024 / 1024)} MB`)
+    pass('0.1 Model available', `${Math.round(fs.statSync(LOCAL_MODEL_PATH).size / 1024 / 1024)} MB`)
   } catch (err) {
     fail('0.1 Model available', err.message?.slice(0, 200) || 'download failed')
     process.exit(1)
   }
 
-  try {
-    ensureCapSync()
-    pass('0.2 cap sync android')
-  } catch (err) {
-    fail('0.2 cap sync android', err.message?.slice(0, 200) || 'failed')
-    // continue — android dir already exists
-  }
-
   // ─── Section 1: Android Setup ─────────────────────────────────────────────
   logSection('1 — Android Setup')
 
-  // 1.1 Find connected device
+  // 1.1 Find or start device/emulator
   let deviceSerial
   try {
-    deviceSerial = getConnectedDevice()
-    if (!deviceSerial) throw new Error('No device found — connect a device or start an emulator')
-    if (process.env.ANDROID_SERIAL && process.env.ANDROID_SERIAL !== deviceSerial) {
-      deviceSerial = process.env.ANDROID_SERIAL
+    deviceSerial = process.env.ANDROID_SERIAL || getConnectedDevice()
+    if (!deviceSerial) {
+      const emulatorBin = findEmulatorBinary()
+      if (!emulatorBin) throw new Error('No device connected and emulator binary not found — install Android SDK or connect a device')
+      const avds = getAvailableAVDs(emulatorBin)
+      if (avds.length === 0) throw new Error('No device connected and no AVDs found — create one via Android Studio or `avdmanager`')
+      deviceSerial = bootEmulator(emulatorBin, avds[0])
     }
-    pass('1.1 Android device connected', `serial ${deviceSerial}`)
+    process.env.ANDROID_SERIAL = deviceSerial
+    pass('1.1 Android device ready', `serial ${deviceSerial}`)
   } catch (err) {
-    fail('1.1 Android device connected', err.message)
+    fail('1.1 Android device ready', err.message)
     console.error('\nFatal: no Android device.\n')
     process.exit(1)
   }
 
-  process.env.ANDROID_SERIAL = deviceSerial
-
-  // 1.2 Build APK
+  // 1.2 Ensure Android project + sync + build
+  let restoreIndex = null
+  let buildFailed = false
   const apkPath = path.join(__dirname, 'android/app/build/outputs/apk/debug/app-debug.apk')
+
   try {
-    console.log('  → Building APK (./gradlew assembleDebug)...')
-    execSync('./gradlew assembleDebug', {
-      cwd: path.join(__dirname, 'android'),
-      encoding: 'utf8',
-      timeout: 600_000,
+    ensureAndroidProject()
+    patchAndroidBuildGradle()
+    patchMinSdkVersion()
+    patchAndroidManifest()
+    restoreIndex = patchWebIndexForTestMode()
+
+    console.log('  → cap sync android...')
+    npx('cap sync android', {
+      cwd: __dirname,
+      timeout: 300_000,
       stdio: ['ignore', 'pipe', 'pipe'],
     })
+    pass('1.2 Android project synced')
+
+    console.log('  → Building APK (./gradlew assembleDebug)...')
+    run('./gradlew assembleDebug', { cwd: path.join(__dirname, 'android') })
     if (!fs.existsSync(apkPath)) throw new Error('APK not found after build')
     const apkSize = Math.round(fs.statSync(apkPath).size / 1024 / 1024)
-    pass('1.2 APK built', `${apkSize} MB`)
+    pass('1.3 APK built', `${apkSize} MB`)
   } catch (err) {
     const msg = (err.stderr || err.stdout || err.message || '').split('\n').filter(l => l.toLowerCase().includes('error')).slice(0, 3).join(' | ') || err.message?.slice(0, 200)
-    fail('1.2 APK built', msg)
-    process.exit(1)
+    fail('1.2 Build pipeline', msg)
+    buildFailed = true
+  } finally {
+    if (restoreIndex) restoreIndex()
   }
+
+  if (buildFailed) process.exit(1)
 
   // 1.3 Install APK + ADB reverse port-forward
   try {
     adb(`reverse tcp:${RUNNER_PORT} tcp:${RUNNER_PORT}`)
     try { adb(`uninstall ${BUNDLE_ID}`) } catch { /* not installed */ }
     adb(`install -r "${apkPath}"`)
-    pass('1.3 APK installed + port-forward', `${BUNDLE_ID}`)
+    pass('1.4 APK installed + port-forward', `${BUNDLE_ID}`)
   } catch (err) {
-    fail('1.3 APK installed + port-forward', err.message?.slice(0, 200))
+    fail('1.4 APK installed + port-forward', err.message?.slice(0, 200))
     process.exit(1)
   }
 
@@ -234,22 +357,22 @@ async function main() {
   try {
     const modelCheck = adb(`shell ls -la ${DEVICE_MODEL_PATH} 2>/dev/null`)
     if (!modelCheck.includes(MODEL_NAME)) throw new Error('not found')
-    pass('1.4 Model on device', DEVICE_MODEL_PATH)
+    pass('1.5 Model on device', DEVICE_MODEL_PATH)
   } catch {
     try {
       console.log('  → Pushing model to device...')
-      adb(`push "${MODEL_PATH}" ${DEVICE_MODEL_PATH}`, { timeout: 300_000 })
-      pass('1.4 Model pushed to device', DEVICE_MODEL_PATH)
+      adb(`push "${LOCAL_MODEL_PATH}" ${DEVICE_MODEL_PATH}`, { timeout: 300_000 })
+      pass('1.5 Model pushed to device', DEVICE_MODEL_PATH)
     } catch (err) {
-      fail('1.4 Model on device', err.message?.slice(0, 200))
+      fail('1.5 Model on device', err.message?.slice(0, 200))
       process.exit(1)
     }
   }
 
   // ─── Section 2: HTTP E2E Test ──────────────────────────────────────────────
-  logSection('2 — LLM Streaming E2E')
+  logSection('2 — LLM Chat E2E')
 
-  // Start HTTP server BEFORE launching app (app connects to server on startup)
+  // Start HTTP server BEFORE launching app
   const { server, allDonePromise } = await startResultServer()
   pass('2.0 HTTP result server started', `port ${RUNNER_PORT}`)
 
@@ -282,7 +405,6 @@ async function main() {
   const appPassed = summary.passed || 0
   const appFailed = summary.failed || 0
 
-  // Count app results as our results
   passedTests += appPassed
   failedTests += appFailed
 

@@ -1,18 +1,16 @@
 #!/usr/bin/env node
 /**
- * capacitor-llm iOS Simulator E2E Test Suite
+ * LLM Chat — iOS Simulator E2E Test Suite
  *
- * Verifies true per-token streaming, cancel-mid-stream,
- * and basic load/unload on iOS Simulator.
+ * Runs the 14-test in-app suite (core LLM + interactive chat UI flow)
+ * on an iOS Simulator via HTTP result collection.
  *
- * Approach: HTTP server on localhost:8099.
- *   - iOS Simulator shares the Mac's loopback network
- *   - index.html POSTs __llm_result and __llm_done to http://127.0.0.1:8099
+ * Auto-setup: model download, cap add ios, deployment target fix,
+ * simulator auto-boot.
  *
  * Prerequisites:
- *   - Booted iOS Simulator (open Simulator.app first)
- *   - GGUF model at test/models/tinyllama-1.1b-chat-v1.0.Q2_K.gguf
- *     (auto-downloaded on first run if missing)
+ *   - macOS with Xcode + at least one iPhone simulator installed
+ *   - GGUF model auto-downloaded on first run
  *
  * Usage:
  *   node test-e2e-ios.mjs
@@ -28,14 +26,14 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT_DIR = path.resolve(__dirname, '..')
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-const BUNDLE_ID   = 'io.t6x.llm.test'
-const RUNNER_PORT = 8099
-const TOTAL_TESTS = 8
-const TIMEOUT_MS  = 300_000  // 5 min — model loading + inference is slow
-const MODEL_NAME  = 'tinyllama-1.1b-chat-v1.0.Q2_K.gguf'
-const MODEL_URL   = 'https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q2_K.gguf'
-const MODEL_DIR   = path.join(ROOT_DIR, 'test/models')
-const MODEL_PATH  = path.join(MODEL_DIR, MODEL_NAME)
+const BUNDLE_ID    = 'io.t6x.llmchat'
+const RUNNER_PORT  = 8099
+const TOTAL_TESTS  = 14
+const TIMEOUT_MS   = 600_000  // 10 min — model loading + inference is slow
+const MODEL_NAME   = 'qwen2.5-1.5b-instruct-q4_k_m.gguf'
+const MODEL_URL    = 'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf'
+const MODEL_DIR    = path.join(ROOT_DIR, 'test/models')
+const MODEL_PATH   = path.join(MODEL_DIR, MODEL_NAME)
 const IOS_MIN_VERSION = '16'
 
 // ─── Test runner state ────────────────────────────────────────────────────────
@@ -56,7 +54,7 @@ function fail(name, error) {
 
 // ─── simctl helpers ───────────────────────────────────────────────────────────
 function simctl(args, opts = {}) {
-  return execSync(`xcrun simctl ${args}`, { encoding: 'utf8', timeout: 30000, ...opts }).trim()
+  return execSync(`xcrun simctl ${args}`, { encoding: 'utf8', timeout: 30000, stdio: ['ignore', 'pipe', 'pipe'], ...opts }).trim()
 }
 
 function getBootedUDID() {
@@ -70,7 +68,47 @@ function getBootedUDID() {
   return null
 }
 
+function findAvailableIPhone() {
+  const json = simctl('list devices available -j')
+  const data = JSON.parse(json)
+  for (const [runtime, devices] of Object.entries(data.devices)) {
+    if (!runtime.includes('iOS')) continue
+    for (const d of devices) {
+      if (d.name.includes('iPhone') && d.isAvailable) return d.udid
+    }
+  }
+  return null
+}
+
+function bootSimulator(udid) {
+  console.log(`  → Booting simulator ${udid}...`)
+  simctl(`boot ${udid}`)
+  // Wait for simulator to be ready
+  for (let i = 0; i < 30; i++) {
+    const booted = getBootedUDID()
+    if (booted) return booted
+    execSync('sleep 1')
+  }
+  throw new Error('Simulator failed to boot within 30s')
+}
+
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
+
+// ─── Shell helper ────────────────────────────────────────────────────────────
+function run(cmd, opts = {}) {
+  const nodePath = execSync('which node', { encoding: 'utf8' }).trim()
+  return execSync(cmd, {
+    encoding: 'utf8',
+    env: { ...process.env, PATH: `${path.dirname(nodePath)}:${process.env.PATH}` },
+    ...opts,
+  }).trim()
+}
+
+function npx(args, opts = {}) {
+  const npmPath = execSync('which npm', { encoding: 'utf8' }).trim()
+  const npxPath = path.join(path.dirname(npmPath), 'npx')
+  return run(`${npxPath} ${args}`, opts)
+}
 
 // ─── HTTP result collector ────────────────────────────────────────────────────
 function startResultServer() {
@@ -133,29 +171,13 @@ function startResultServer() {
   return serverReady
 }
 
-// ─── Shell helper ────────────────────────────────────────────────────────────
-function run(cmd, opts = {}) {
-  const nodePath = execSync('which node', { encoding: 'utf8' }).trim()
-  return execSync(cmd, {
-    encoding: 'utf8',
-    env: { ...process.env, PATH: `${path.dirname(nodePath)}:${process.env.PATH}` },
-    ...opts,
-  }).trim()
-}
-
-function npx(args, opts = {}) {
-  const npmPath = execSync('which npm', { encoding: 'utf8' }).trim()
-  const npxPath = path.join(path.dirname(npmPath), 'npx')
-  return run(`${npxPath} ${args}`, opts)
-}
-
 // ─── Project setup (idempotent) ──────────────────────────────────────────────
 function ensureModel() {
   if (fs.existsSync(MODEL_PATH)) return
-  console.log(`  → Downloading model (${MODEL_NAME})...`)
+  console.log(`  → Downloading model (${MODEL_NAME}, ~1.1 GB)...`)
   fs.mkdirSync(MODEL_DIR, { recursive: true })
-  execSync(`curl -L -o "${MODEL_PATH}" "${MODEL_URL}"`, {
-    stdio: ['ignore', 'pipe', 'pipe'],
+  execSync(`curl -L --progress-bar -o "${MODEL_PATH}" "${MODEL_URL}"`, {
+    stdio: ['ignore', process.stderr, 'pipe'],
     timeout: 600_000,
   })
 }
@@ -190,7 +212,7 @@ function fixDeploymentTarget() {
 //  MAIN
 // ═════════════════════════════════════════════════════════════════════════════
 async function main() {
-  console.log('\n🔵 capacitor-llm iOS Simulator E2E Test Suite\n')
+  console.log('\n🔵 LLM Chat iOS Simulator E2E Test Suite\n')
 
   // ─── Section 0: Project Setup ──────────────────────────────────────────
   logSection('0 — Project Setup')
@@ -215,15 +237,19 @@ async function main() {
   // ─── Section 1: Simulator Setup ──────────────────────────────────────────
   logSection('1 — Simulator Setup')
 
-  // 1.1 Find booted simulator
+  // 1.1 Find or boot simulator
   let udid
   try {
     udid = getBootedUDID()
-    if (!udid) throw new Error('No booted simulator found — open Simulator.app first')
-    pass('1.1 Booted simulator found', `UDID ${udid}`)
+    if (!udid) {
+      const available = findAvailableIPhone()
+      if (!available) throw new Error('No available iPhone simulator — install one via Xcode')
+      udid = bootSimulator(available)
+    }
+    pass('1.1 Simulator ready', `UDID ${udid}`)
   } catch (err) {
-    fail('1.1 Booted simulator found', err.message)
-    console.error('\nFatal: no booted simulator.\n')
+    fail('1.1 Simulator ready', err.message)
+    console.error('\nFatal: no simulator available.\n')
     process.exit(1)
   }
 
@@ -305,15 +331,14 @@ async function main() {
     process.exit(1)
   }
 
-  // 1.6 Patch the installed app's HTML with the model path
+  // 1.6 Patch the installed app's HTML with TEST_MODE + model path
   try {
     const bundleDir = simctl(`get_app_container ${udid} ${BUNDLE_ID}`)
     const htmlInBundle = path.join(bundleDir, 'public/index.html')
     let html = fs.readFileSync(htmlInBundle, 'utf8')
-    html = html.replace(
-      /(?:const|let|var)\s+MODEL_PATH\s*=\s*'[^']*'/,
-      `const MODEL_PATH = '${modelSimPath}'`
-    )
+    html = html
+      .replace(/var TEST_MODE = (true|false)/, 'var TEST_MODE = true')
+      .replace(/var MODEL_PATH = '[^']*'/, `var MODEL_PATH = '${modelSimPath}'`)
     fs.writeFileSync(htmlInBundle, html)
     pass('1.6 HTML patched', modelSimPath.split('/').slice(-3).join('/'))
   } catch (err) {
@@ -322,7 +347,7 @@ async function main() {
   }
 
   // ─── Section 2: HTTP E2E Test ──────────────────────────────────────────────
-  logSection('2 — LLM Streaming E2E')
+  logSection('2 — LLM Chat E2E')
 
   // Start HTTP server BEFORE launching app
   const { server, allDonePromise } = await startResultServer()

@@ -10,11 +10,10 @@ android/.cxx/
 *.js.map
 *.d.ts
 !src/**/*.ts
-example/android/build/
-example/android/.gradle/
-example/android/.cxx/
-example/android/app/build/
-examples/
+example/android/
+example/ios/
+example/node_modules/
+example/package-lock.json
 *.gguf
 !test/fixtures/*.gguf
 test/models/

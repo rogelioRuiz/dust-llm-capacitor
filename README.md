@@ -333,6 +333,53 @@ npm run lint        # biome check
 npm run typecheck   # tsc --noEmit
 ```
 
+## Example app & E2E tests
+
+The `example/` directory contains **LLM Chat** — a full interactive chat app that doubles as the E2E test suite (14 in-app tests covering model loading, streaming, cancellation, stop sequences, and multi-turn chat UI).
+
+### Quick start
+
+```bash
+# From repo root — single command
+npm run test:ios       # iOS (requires booted simulator)
+npm run test:android   # Android (requires connected device/emulator)
+```
+
+Or step by step:
+
+```bash
+npm install && npm run build    # build the plugin
+cd example && npm install       # install example deps
+
+# iOS
+node test-e2e-ios.mjs
+
+# Android
+node test-e2e-android.mjs
+```
+
+### What the test scripts auto-handle
+
+- Download [Qwen 2.5 1.5B Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF) Q4_K_M (~1.1 GB, cached in `test/models/`)
+- `cap add ios` / `cap add android` if platform directory is missing
+- iOS: patch deployment target to 16.0, SPM resolution
+- Android: patch Kotlin Gradle plugin, minSdk 26, cleartext HTTP for localhost
+- `cap sync`, native build (`xcodebuild` / `gradlew assembleDebug`)
+- App install, model deployment to simulator/device, HTTP result collection
+
+### Prerequisites
+
+| | iOS | Android |
+|---|---|---|
+| **OS** | macOS | macOS / Linux / Windows |
+| **Runtime** | Auto-boots simulator if needed | Auto-starts emulator if needed |
+| **SDK** | Xcode with at least one iPhone simulator | JDK 17 + Android SDK + at least one AVD |
+| **Node** | >= 20 | >= 20 |
+
+### Interactive mode
+
+Set `TEST_MODE = false` in `example/www/index.html` to use the app as a regular chat interface with the on-device model.
+
 ## Native dependencies
 
 | Platform | Package | Source |

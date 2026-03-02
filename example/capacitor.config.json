@@ -1,6 +1,6 @@
 {
-  "appId": "io.t6x.llm.test",
-  "appName": "LLM Test",
+  "appId": "io.t6x.llmchat",
+  "appName": "LLM Chat",
   "webDir": "www",
   "android": {
     "allowMixedContent": true

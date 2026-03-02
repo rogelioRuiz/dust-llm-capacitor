@@ -17,6 +17,8 @@
     "lint": "biome check .",
     "lint:fix": "biome check --fix .",
     "typecheck": "tsc --noEmit",
+    "test:ios": "npm run build && cd example && npm install && node test-e2e-ios.mjs",
+    "test:android": "npm run build && cd example && npm install && node test-e2e-android.mjs",
     "prepublishOnly": "npm run build"
   },
   "capacitor": {

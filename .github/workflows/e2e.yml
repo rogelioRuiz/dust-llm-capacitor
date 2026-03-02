@@ -1,0 +1,39 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-ios:
+    name: iOS E2E
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Cache GGUF model
+        uses: actions/cache@v4
+        with:
+          path: test/models
+          key: gguf-qwen2.5-1.5b-instruct-q4_k_m
+
+      - name: Build plugin
+        run: npm ci && npm run build
+
+      - name: Run iOS E2E
+        working-directory: example
+        run: npm install && node test-e2e-ios.mjs

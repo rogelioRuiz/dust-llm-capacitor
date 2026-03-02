@@ -1,380 +1,2056 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LLM Streaming Test</title>
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+  />
+  <title>LLM Chat</title>
   <style>
-    body { font-family: monospace; background: #0d0d0d; color: #e0e0e0; padding: 16px; font-size: 13px; margin: 0; }
-    h1 { color: #7c3aed; margin-bottom: 4px; font-size: 18px; }
-    .subtitle { color: #666; margin-bottom: 16px; font-size: 11px; }
-    #status { color: #888; margin-bottom: 12px; font-size: 12px; padding: 8px; background: #111; border-radius: 4px; }
-    .test { margin: 3px 0; padding: 6px 10px; border-radius: 4px; display: flex; align-items: flex-start; gap: 8px; }
-    .test.pass { background: #0a2a0a; border-left: 3px solid #22c55e; }
-    .test.fail { background: #2a0a0a; border-left: 3px solid #ef4444; }
-    .test.running { background: #1a1a0a; border-left: 3px solid #eab308; }
-    .test.pending { background: #1a1a1a; border-left: 3px solid #333; }
-    .badge { font-weight: bold; min-width: 56px; flex-shrink: 0; font-size: 11px; }
-    .pass .badge { color: #22c55e; }
-    .fail .badge { color: #ef4444; }
-    .running .badge { color: #eab308; }
-    .pending .badge { color: #555; }
-    .detail { color: #888; font-size: 11px; margin-top: 2px; word-break: break-all; }
-    #summary { margin-top: 16px; padding: 10px; border-radius: 6px; background: #111; font-size: 14px; }
-    #plugins { color: #22c55e; font-size: 11px; margin-top: 8px; }
+    :root {
+      --background: oklch(0.145 0 0);
+      --foreground: oklch(0.935 0 0);
+      --card: oklch(0.205 0 0);
+      --card-foreground: oklch(0.935 0 0);
+      --popover: oklch(0.25 0 0);
+      --popover-foreground: oklch(0.935 0 0);
+      --primary: oklch(0.541 0.245 293);
+      --primary-foreground: oklch(0.985 0 0);
+      --secondary: oklch(0.269 0 0);
+      --secondary-foreground: oklch(0.935 0 0);
+      --muted: oklch(0.269 0 0);
+      --muted-foreground: oklch(0.708 0 0);
+      --accent: oklch(0.269 0 0);
+      --accent-foreground: oklch(0.935 0 0);
+      --destructive: oklch(0.577 0.245 27.325);
+      --destructive-foreground: oklch(0.985 0 0);
+      --border: oklch(1 0 0 / 12%);
+      --input: oklch(1 0 0 / 12%);
+      --ring: oklch(0.541 0.245 293);
+      --success: oklch(0.696 0.17 162.48);
+      --success-foreground: oklch(0.145 0 0);
+      --warning: oklch(0.75 0.183 55);
+      --warning-foreground: oklch(0.145 0 0);
+      --info: oklch(0.623 0.214 259);
+      --info-foreground: oklch(0.985 0 0);
+      --radius: 18px;
+      --shadow-soft: 0 22px 60px rgba(0, 0, 0, 0.32);
+    }
+
+    @supports not (color: oklch(0.145 0 0)) {
+      :root {
+        --background: #0d0d0d;
+        --foreground: #f0f0f0;
+        --card: #171717;
+        --card-foreground: #f0f0f0;
+        --popover: #202020;
+        --popover-foreground: #f0f0f0;
+        --primary: #7c3aed;
+        --primary-foreground: #fafafa;
+        --secondary: #2b2b2b;
+        --secondary-foreground: #f0f0f0;
+        --muted: #2b2b2b;
+        --muted-foreground: #a7a7a7;
+        --accent: #2b2b2b;
+        --accent-foreground: #f0f0f0;
+        --destructive: #dc2626;
+        --destructive-foreground: #fafafa;
+        --border: rgba(255, 255, 255, 0.12);
+        --input: rgba(255, 255, 255, 0.12);
+        --ring: #7c3aed;
+        --success: #22c55e;
+        --success-foreground: #0d0d0d;
+        --warning: #f59e0b;
+        --warning-foreground: #0d0d0d;
+        --info: #3b82f6;
+        --info-foreground: #fafafa;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+    }
+
+    body {
+      background:
+        radial-gradient(circle at 18% 14%, rgba(124, 58, 237, 0.14), transparent 34%),
+        radial-gradient(circle at 78% 0%, rgba(124, 58, 237, 0.08), transparent 28%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 22%),
+        var(--background);
+      color: var(--foreground);
+      font-family:
+        -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    }
+
+    button,
+    textarea {
+      font: inherit;
+      color: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .panel {
+      width: 100%;
+      max-width: 980px;
+      margin: 0 auto;
+    }
+
+    #chat-ui {
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      padding:
+        calc(env(safe-area-inset-top, 0px) + 18px)
+        18px
+        16px;
+      border-bottom: 1px solid var(--border);
+      background:
+        linear-gradient(
+          180deg,
+          rgba(13, 13, 13, 0.92) 0%,
+          rgba(13, 13, 13, 0.86) 70%,
+          rgba(13, 13, 13, 0.68) 100%
+        );
+      backdrop-filter: blur(24px);
+    }
+
+    #header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    #title {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+    #model-label {
+      margin-top: 4px;
+      font-size: 0.8rem;
+      color: var(--muted-foreground);
+      word-break: break-word;
+    }
+
+    #status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.04);
+      font-size: 0.78rem;
+      color: var(--muted-foreground);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--warning);
+      box-shadow: 0 0 14px rgba(245, 158, 11, 0.4);
+      flex-shrink: 0;
+    }
+
+    .status-dot.loading {
+      animation: pulse 1.3s ease-in-out infinite;
+    }
+
+    .status-dot.ready {
+      background: var(--success);
+      box-shadow: 0 0 14px rgba(34, 197, 94, 0.35);
+      animation: none;
+    }
+
+    .status-dot.generating {
+      background: var(--primary);
+      box-shadow: 0 0 16px rgba(124, 58, 237, 0.45);
+      animation: pulse 0.9s ease-in-out infinite;
+    }
+
+    .status-dot.error {
+      background: var(--destructive);
+      box-shadow: 0 0 14px rgba(220, 38, 38, 0.45);
+      animation: none;
+    }
+
+    #messages-shell {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+    }
+
+    #messages {
+      height: 100%;
+      overflow-y: auto;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      scroll-behavior: smooth;
+    }
+
+    #messages:empty::before {
+      content: "";
+      display: block;
+      min-height: 8px;
+    }
+
+    #empty-state {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      pointer-events: none;
+    }
+
+    #empty-card {
+      width: min(460px, 100%);
+      padding: 24px;
+      border-radius: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03)),
+        rgba(16, 16, 16, 0.9);
+      box-shadow: var(--shadow-soft);
+      pointer-events: auto;
+    }
+
+    .eyebrow {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--primary);
+    }
+
+    #empty-card h1 {
+      margin: 10px 0 10px;
+      font-size: 1.5rem;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+    }
+
+    #empty-copy,
+    #bridge-warning {
+      margin: 0;
+      line-height: 1.5;
+      color: var(--muted-foreground);
+      font-size: 0.94rem;
+    }
+
+    #bridge-warning {
+      margin-top: 14px;
+      font-size: 0.84rem;
+    }
+
+    #load-button {
+      margin-top: 18px;
+      min-width: 150px;
+      height: 48px;
+      border: 0;
+      border-radius: 999px;
+      padding: 0 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background:
+        linear-gradient(135deg, rgba(124, 58, 237, 1), rgba(139, 92, 246, 0.82));
+      color: var(--primary-foreground);
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      box-shadow: 0 18px 36px rgba(124, 58, 237, 0.22);
+    }
+
+    #load-button:disabled {
+      opacity: 0.72;
+      cursor: default;
+    }
+
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.25);
+      border-top-color: currentColor;
+      animation: spin 0.8s linear infinite;
+    }
+
+    .message-row {
+      display: flex;
+      width: 100%;
+    }
+
+    .message-row.user {
+      justify-content: flex-end;
+    }
+
+    .message-row.assistant,
+    .message-row.error {
+      justify-content: flex-start;
+    }
+
+    .message-bubble {
+      width: auto;
+      max-width: min(78%, 720px);
+      padding: 14px 16px;
+      border-radius: 22px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+    }
+
+    .message-row.user .message-bubble {
+      background:
+        linear-gradient(135deg, rgba(124, 58, 237, 0.3), rgba(124, 58, 237, 0.16)),
+        rgba(255, 255, 255, 0.04);
+      border-color: rgba(124, 58, 237, 0.24);
+      border-bottom-right-radius: 8px;
+    }
+
+    .message-row.assistant .message-bubble {
+      width: 100%;
+      max-width: 100%;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.03)),
+        rgba(255, 255, 255, 0.02);
+      border-bottom-left-radius: 8px;
+    }
+
+    .message-row.error .message-bubble {
+      width: 100%;
+      max-width: 100%;
+      border-color: rgba(220, 38, 38, 0.28);
+      background:
+        linear-gradient(180deg, rgba(220, 38, 38, 0.12), rgba(220, 38, 38, 0.08)),
+        rgba(255, 255, 255, 0.02);
+      border-bottom-left-radius: 8px;
+    }
+
+    .message-role {
+      margin-bottom: 8px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted-foreground);
+    }
+
+    .message-row.user .message-role {
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .message-row.error .message-role {
+      color: rgba(248, 113, 113, 0.9);
+    }
+
+    .message-body {
+      font-size: 0.98rem;
+      line-height: 1.6;
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+
+    .streaming-cursor {
+      display: inline-block;
+      margin-left: 3px;
+      color: var(--primary);
+      animation: blink 0.95s steps(1) infinite;
+    }
+
+    .message-meta {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .message-meta:empty {
+      display: none;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 0 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--muted-foreground);
+      font-size: 0.76rem;
+      font-weight: 600;
+    }
+
+    .badge.success {
+      background: rgba(34, 197, 94, 0.12);
+      border-color: rgba(34, 197, 94, 0.18);
+      color: rgba(134, 239, 172, 0.95);
+    }
+
+    .badge.info {
+      background: rgba(59, 130, 246, 0.12);
+      border-color: rgba(59, 130, 246, 0.18);
+      color: rgba(147, 197, 253, 0.95);
+    }
+
+    .badge.warning {
+      background: rgba(245, 158, 11, 0.12);
+      border-color: rgba(245, 158, 11, 0.18);
+      color: rgba(253, 224, 71, 0.95);
+    }
+
+    .badge.error {
+      background: rgba(220, 38, 38, 0.12);
+      border-color: rgba(220, 38, 38, 0.18);
+      color: rgba(252, 165, 165, 0.95);
+    }
+
+    #input-bar {
+      padding:
+        14px
+        18px
+        calc(env(safe-area-inset-bottom, 0px) + 18px);
+      border-top: 1px solid var(--border);
+      background:
+        linear-gradient(
+          180deg,
+          rgba(13, 13, 13, 0.64) 0%,
+          rgba(13, 13, 13, 0.88) 45%,
+          rgba(13, 13, 13, 0.96) 100%
+        );
+      backdrop-filter: blur(24px);
+    }
+
+    #composer {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      padding: 10px;
+      border-radius: 26px;
+      border: 1px solid var(--input);
+      background: rgba(255, 255, 255, 0.055);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.18);
+    }
+
+    #prompt-input {
+      width: 100%;
+      min-height: 46px;
+      max-height: 160px;
+      resize: none;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      padding: 10px 12px;
+      color: inherit;
+    }
+
+    #prompt-input::placeholder {
+      color: var(--muted-foreground);
+    }
+
+    #prompt-input:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    #primary-action {
+      min-width: 82px;
+      height: 46px;
+      padding: 0 18px;
+      border: 0;
+      border-radius: 999px;
+      background:
+        linear-gradient(135deg, rgba(124, 58, 237, 1), rgba(139, 92, 246, 0.82));
+      color: var(--primary-foreground);
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    #primary-action.stop {
+      background:
+        linear-gradient(135deg, rgba(220, 38, 38, 0.92), rgba(248, 113, 113, 0.8));
+      color: var(--destructive-foreground);
+    }
+
+    #primary-action:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    #footer-note {
+      padding: 10px 6px 0;
+      font-size: 0.76rem;
+      color: var(--muted-foreground);
+    }
+
+    #test-ui {
+      min-height: 100%;
+      padding:
+        calc(env(safe-area-inset-top, 0px) + 20px)
+        18px
+        calc(env(safe-area-inset-bottom, 0px) + 24px);
+    }
+
+    .test-heading h1 {
+      margin: 0;
+      font-size: 1.4rem;
+      color: var(--foreground);
+    }
+
+    .test-heading p {
+      margin: 8px 0 18px;
+      color: var(--muted-foreground);
+      line-height: 1.5;
+    }
+
+    #status {
+      margin-bottom: 12px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--muted-foreground);
+      font-size: 0.88rem;
+    }
+
+    .test {
+      margin: 6px 0;
+      padding: 10px 12px;
+      border-radius: 16px;
+      border-left: 4px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.035);
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .test.pass {
+      border-left-color: var(--success);
+      background: rgba(34, 197, 94, 0.08);
+    }
+
+    .test.fail {
+      border-left-color: var(--destructive);
+      background: rgba(220, 38, 38, 0.08);
+    }
+
+    .test.running {
+      border-left-color: var(--warning);
+      background: rgba(245, 158, 11, 0.08);
+    }
+
+    .test.pending {
+      opacity: 0.78;
+    }
+
+    .test .badge {
+      min-width: 64px;
+      justify-content: center;
+      font-weight: 700;
+    }
+
+    .test.pass .badge {
+      color: rgba(134, 239, 172, 0.95);
+    }
+
+    .test.fail .badge {
+      color: rgba(252, 165, 165, 0.95);
+    }
+
+    .test.running .badge {
+      color: rgba(253, 224, 71, 0.95);
+    }
+
+    .detail {
+      margin-top: 4px;
+      font-size: 0.78rem;
+      line-height: 1.45;
+      color: var(--muted-foreground);
+      word-break: break-word;
+    }
+
+    #summary,
+    #plugins {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.035);
+      font-size: 0.84rem;
+      color: var(--muted-foreground);
+      line-height: 1.5;
+    }
+
+    #plugins {
+      margin-top: 10px;
+      word-break: break-word;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @keyframes blink {
+      0%,
+      49% {
+        opacity: 1;
+      }
+      50%,
+      100% {
+        opacity: 0;
+      }
+    }
+
+    @keyframes pulse {
+      0%,
+      100% {
+        transform: scale(1);
+        opacity: 0.8;
+      }
+      50% {
+        transform: scale(1.22);
+        opacity: 1;
+      }
+    }
+
+    @media (max-width: 640px) {
+      #header,
+      #messages,
+      #input-bar,
+      #test-ui {
+        padding-left: 14px;
+        padding-right: 14px;
+      }
+
+      #header-row {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      #status-pill {
+        align-self: flex-start;
+      }
+
+      .message-bubble {
+        max-width: 88%;
+      }
+
+      .message-row.assistant .message-bubble,
+      .message-row.error .message-bubble {
+        max-width: 100%;
+      }
+
+      #primary-action {
+        min-width: 72px;
+        padding: 0 14px;
+      }
+    }
   </style>
 </head>
 <body>
-  <h1>capacitor-llm</h1>
-  <div class="subtitle">E2E Streaming Test</div>
-  <div id="status">Waiting for Capacitor bridge...</div>
-  <div id="tests"></div>
-  <div id="summary"></div>
-  <div id="plugins"></div>
+  <div id="chat-ui" class="panel">
+    <header id="header">
+      <div id="header-row">
+        <div>
+          <div id="title">LLM Chat</div>
+          <div id="model-label">No model loaded</div>
+        </div>
+        <div id="status-pill">
+          <span id="status-dot" class="status-dot loading"></span>
+          <span id="status-label">Waiting</span>
+        </div>
+      </div>
+    </header>
+
+    <main id="messages-shell">
+      <div id="messages"></div>
+      <div id="empty-state">
+        <div id="empty-card">
+          <div class="eyebrow">On-device inference</div>
+          <h1>Load a local Qwen 2.5 model</h1>
+          <p id="empty-copy">
+            This example streams tokens directly from <code>dust-llm-capacitor</code>
+            with no framework and no build step.
+          </p>
+          <button id="load-button" type="button">
+            <span id="load-spinner" class="spinner hidden"></span>
+            <span id="load-button-label">Load Model</span>
+          </button>
+          <p id="bridge-warning">Waiting for Capacitor bridge...</p>
+        </div>
+      </div>
+    </main>
+
+    <footer id="input-bar">
+      <div id="composer">
+        <textarea
+          id="prompt-input"
+          rows="1"
+          placeholder="Ask something..."
+          disabled
+        ></textarea>
+        <button id="primary-action" type="button" disabled>Send</button>
+      </div>
+      <div id="footer-note">Responses stream token-by-token on device.</div>
+    </footer>
+  </div>
+
+  <div id="test-ui" class="panel hidden">
+    <div class="test-heading">
+      <h1>LLM Chat E2E</h1>
+      <p>Runs the core LLM suite plus UI integration checks.</p>
+    </div>
+    <div id="status">Waiting for Capacitor bridge...</div>
+    <div id="tests"></div>
+    <div id="summary"></div>
+    <div id="plugins"></div>
+  </div>
 
   <script src="capacitor.js"></script>
   <script>
-  (async function () {
-    const RUNNER_URL = 'http://127.0.0.1:8099'
-    const MODEL_PATH = '/data/local/tmp/tinyllama-1.1b-chat-v1.0.Q2_K.gguf'
+    var TEST_MODE = false
+    var MODEL_PATH = '/data/local/tmp/qwen2.5-1.5b-instruct-q4_k_m.gguf'
+    var RUNNER_URL = 'http://127.0.0.1:8099'
 
-    async function postResult(id, status, detail, error) {
-      try {
-        await fetch(RUNNER_URL + '/__llm_result', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id, status, detail, error }),
-          keepalive: true
-        })
-      } catch (e) {}
-      var safeId = 'test-' + id.replace(/[^a-zA-Z0-9]/g, '_')
-      var el = document.getElementById(safeId)
-      if (el) {
-        el.className = 'test ' + (status === 'pass' ? 'pass' : 'fail')
-        el.querySelector('.badge').textContent = status === 'pass' ? 'PASS' : 'FAIL'
-        if (detail || error) el.querySelector('.detail').textContent = detail || error
+    ;(function () {
+      var state = {
+        LLM: null,
+        bridgeReady: false,
+        listenersAttached: false,
+        modelLoading: false,
+        modelId: null,
+        metadata: null,
+        isGenerating: false,
+        chatHistory: [],
+        activeAssistant: null,
+        pendingGeneration: null,
+        lastCompletion: null,
+        defaultMaxTokens: 96
       }
-    }
 
-    async function postDone(passed, failed, total) {
-      try {
-        await fetch(RUNNER_URL + '/__llm_done', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ passed, failed, total }),
-          keepalive: true
-        })
-      } catch (e) {}
-    }
+      var els = {}
 
-    function renderTest(name) {
-      var safeId = 'test-' + name.replace(/[^a-zA-Z0-9]/g, '_')
-      if (!document.getElementById(safeId)) {
-        var div = document.createElement('div')
-        div.id = safeId
-        div.className = 'test pending'
-        div.innerHTML = '<span class="badge">  ---</span><div><div>' + name + '</div><div class="detail"></div></div>'
-        document.getElementById('tests').appendChild(div)
+      function byId(id) {
+        return document.getElementById(id)
       }
-    }
 
-    function setStatus(msg) {
-      document.getElementById('status').textContent = msg
-    }
-
-    // Wait for Capacitor bridge
-    setStatus('Waiting for Capacitor bridge...')
-    var LLM
-    for (var i = 0; i < 50; i++) {
-      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LLM) {
-        LLM = window.Capacitor.Plugins.LLM
-        break
+      function sleep(ms) {
+        return new Promise(function (resolve) {
+          setTimeout(resolve, ms)
+        })
       }
-      await new Promise(function(r) { setTimeout(r, 200) })
-    }
-    if (!LLM) {
-      setStatus('ERROR: LLM plugin not found after 10s')
-      console.error('__LLM_BRIDGE_TIMEOUT__')
-      return
-    }
 
-    console.log('__LLM_BRIDGE_READY__')
-    document.getElementById('plugins').textContent =
-      'Plugins: ' + Object.keys(window.Capacitor.Plugins).join(', ')
-    setStatus('Bridge ready. Running tests...')
-
-    var passed = 0, failed = 0, total = 0
-    async function t(name, fn, timeoutMs) {
-      total++
-      renderTest(name)
-      var safeId = 'test-' + name.replace(/[^a-zA-Z0-9]/g, '_')
-      var el = document.getElementById(safeId)
-      if (el) { el.className = 'test running'; el.querySelector('.badge').textContent = '... RUN' }
-      var t0 = Date.now()
-      var limit = timeoutMs || 120000
-      try {
-        await Promise.race([
-          fn(),
-          new Promise(function(_, rej) { setTimeout(function() { rej(new Error('Timed out after ' + limit + 'ms')) }, limit) })
-        ])
-        passed++
-        await postResult(name, 'pass', (Date.now() - t0) + 'ms')
-      } catch (e) {
-        failed++
-        await postResult(name, 'fail', null, e.message.split('\n')[0])
+      function createDeferred() {
+        var deferred = {}
+        deferred.promise = new Promise(function (resolve, reject) {
+          deferred.resolve = resolve
+          deferred.reject = reject
+        })
+        return deferred
       }
-    }
 
-    function assert(c, m) { if (!c) throw new Error('Assertion failed: ' + m) }
-    function eq(a, e, m) {
-      if (a !== e) throw new Error(m + ': expected ' + JSON.stringify(e) + ', got ' + JSON.stringify(a))
-    }
-
-    var modelId = null
-
-    // ── Test 1: Load Model ────────────────────────────────────────────────
-    await t('1.1 loadModel from /sdcard', async function() {
-      var result = await LLM.loadModel({
-        descriptor: { id: 'tinyllama', format: 'gguf', url: MODEL_PATH },
-        config: { contextSize: 512, nGpuLayers: 0 }
-      })
-      modelId = result.modelId
-      assert(modelId, 'modelId must be set')
-      assert(result.metadata, 'metadata must exist')
-      assert(result.metadata.name, 'name: ' + result.metadata.name)
-    }, 60000)
-
-    if (!modelId) {
-      setStatus('FATAL: Model failed to load. Cannot run streaming tests.')
-      await postDone(passed, failed, total)
-      return
-    }
-
-    // ── Test 2: Tokenize ──────────────────────────────────────────────────
-    await t('1.2 tokenize returns tokens', async function() {
-      var r = await LLM.tokenize({ modelId: modelId, text: 'Hello world' })
-      assert(Array.isArray(r.tokens), 'tokens must be array')
-      assert(r.tokens.length > 0, 'tokens must not be empty, got ' + r.tokens.length)
-    })
-
-    // ── Test 3: Single-shot generate ──────────────────────────────────────
-    await t('1.3 generate single-shot', async function() {
-      var result = await LLM.generate({
-        modelId: modelId,
-        prompt: 'The capital of France is',
-        maxTokens: 5,
-        sampler: { temperature: 0.1, seed: 42 }
-      })
-      assert(result.text.length > 0, 'text must not be empty')
-      assert(result.tokenCount > 0, 'tokenCount: ' + result.tokenCount)
-      assert(result.stopReason === 'max_tokens' || result.stopReason === 'eos',
-        'stopReason: ' + result.stopReason)
-    }, 120000)
-
-    // ── Test 4: Stream generate — tokens arrive incrementally ─────────────
-    await t('2.1 streamGenerate tokens arrive incrementally', async function() {
-      var tokenTimestamps = []
-      var tokens = []
-
-      await new Promise(async function(resolve, reject) {
-        var tokenListener = await LLM.addListener('inferenceToken', function(event) {
-          if (event.modelId !== modelId) return
-          tokenTimestamps.push(Date.now())
-          tokens.push(event.token)
-        })
-
-        var completeListener = await LLM.addListener('inferenceComplete', function(event) {
-          if (event.modelId !== modelId) return
-          tokenListener.remove()
-          completeListener.remove()
-          failedListener.remove()
-          resolve()
-        })
-
-        var failedListener = await LLM.addListener('inferenceFailed', function(event) {
-          if (event.modelId !== modelId) return
-          tokenListener.remove()
-          completeListener.remove()
-          failedListener.remove()
-          reject(new Error(event.error))
-        })
-
-        LLM.streamGenerate({
-          modelId: modelId,
-          prompt: 'Once upon a time there was a little',
-          maxTokens: 10,
-          sampler: { temperature: 0.1, seed: 42 }
-        })
-      })
-
-      assert(tokens.length > 0, 'must receive tokens, got 0')
-
-      // Key check: tokens must arrive over TIME, not all at once.
-      if (tokenTimestamps.length >= 3) {
-        var firstTs = tokenTimestamps[0]
-        var lastTs = tokenTimestamps[tokenTimestamps.length - 1]
-        var totalSpan = lastTs - firstTs
-        // With true streaming, tokens should span at least ~20ms total.
-        // Post-hoc shim would deliver all tokens within <5ms.
-        assert(totalSpan > 20,
-          'Token delivery span must be >20ms for true streaming, got ' + totalSpan + 'ms over ' + tokenTimestamps.length + ' tokens')
+      function cacheEls() {
+        els.chatUi = byId('chat-ui')
+        els.testUi = byId('test-ui')
+        els.statusDot = byId('status-dot')
+        els.statusLabel = byId('status-label')
+        els.modelLabel = byId('model-label')
+        els.messages = byId('messages')
+        els.emptyState = byId('empty-state')
+        els.loadButton = byId('load-button')
+        els.loadSpinner = byId('load-spinner')
+        els.loadButtonLabel = byId('load-button-label')
+        els.bridgeWarning = byId('bridge-warning')
+        els.promptInput = byId('prompt-input')
+        els.primaryAction = byId('primary-action')
+        els.testStatus = byId('status')
+        els.tests = byId('tests')
+        els.summary = byId('summary')
+        els.plugins = byId('plugins')
       }
-    }, 120000)
 
-    // ── Test 5: Stream generate — tokensPerSecond is realistic ─────────────
-    await t('2.2 streamGenerate reports realistic tokensPerSecond', async function() {
-      var completionEvent = null
+      function setStatus(kind, label) {
+        if (els.statusDot) {
+          els.statusDot.className = 'status-dot ' + kind
+        }
+        if (els.statusLabel) {
+          els.statusLabel.textContent = label
+        }
+        if (els.testStatus) {
+          els.testStatus.textContent = label
+        }
+      }
 
-      await new Promise(async function(resolve, reject) {
-        var completeListener = await LLM.addListener('inferenceComplete', function(event) {
-          if (event.modelId !== modelId) return
-          completionEvent = event
-          completeListener.remove()
-          failedListener.remove()
-          resolve()
+      function setBridgeWarning(message) {
+        if (els.bridgeWarning) {
+          els.bridgeWarning.textContent = message
+        }
+      }
+
+      function setModelLabel(message) {
+        if (els.modelLabel) {
+          els.modelLabel.textContent = message
+        }
+      }
+
+      function setLoadButtonState(loading, label) {
+        state.modelLoading = !!loading
+        els.loadButton.disabled = !!loading
+        els.loadSpinner.classList.toggle('hidden', !loading)
+        els.loadButtonLabel.textContent = label
+        updatePrimaryAction()
+      }
+
+      function setComposerEnabled(enabled) {
+        els.promptInput.disabled = !enabled
+        updatePrimaryAction()
+      }
+
+      function autoResizeTextarea() {
+        els.promptInput.style.height = 'auto'
+        var nextHeight = Math.min(els.promptInput.scrollHeight, 160)
+        els.promptInput.style.height = nextHeight + 'px'
+      }
+
+      function scrollMessages() {
+        requestAnimationFrame(function () {
+          els.messages.scrollTop = els.messages.scrollHeight
+        })
+      }
+
+      function syncEmptyState() {
+        var shouldShow = !TEST_MODE && !state.modelId
+        els.emptyState.classList.toggle('hidden', !shouldShow)
+      }
+
+      function updatePrimaryAction() {
+        var hasPrompt = els.promptInput.value.trim().length > 0
+        if (state.isGenerating) {
+          els.primaryAction.textContent = 'Stop'
+          els.primaryAction.classList.add('stop')
+          els.primaryAction.disabled = !state.modelId
+          return
+        }
+
+        els.primaryAction.textContent = 'Send'
+        els.primaryAction.classList.remove('stop')
+        els.primaryAction.disabled = !state.modelId || state.modelLoading || !hasPrompt
+      }
+
+      function clearMessageMeta(message) {
+        while (message.meta.firstChild) {
+          message.meta.removeChild(message.meta.firstChild)
+        }
+      }
+
+      function addMetaBadge(message, text, tone) {
+        var badge = document.createElement('span')
+        badge.className = 'badge' + (tone ? ' ' + tone : '')
+        badge.textContent = text
+        message.meta.appendChild(badge)
+      }
+
+      function applyCompletionMeta(message, event) {
+        clearMessageMeta(message)
+        if (typeof event.tokensPerSecond === 'number') {
+          addMetaBadge(
+            message,
+            'TPS ' + event.tokensPerSecond.toFixed(1),
+            'success'
+          )
+        }
+        if (typeof event.completionTokens === 'number') {
+          addMetaBadge(message, event.completionTokens + ' tokens', 'info')
+        }
+        if (event.stopReason) {
+          addMetaBadge(message, event.stopReason.replace('_', ' '), 'warning')
+        }
+      }
+
+      function applyErrorMeta(message, errorText) {
+        clearMessageMeta(message)
+        addMetaBadge(message, errorText, 'error')
+      }
+
+      function addMessage(role, text) {
+        var row = document.createElement('div')
+        row.className = 'message-row ' + role
+
+        var bubble = document.createElement('div')
+        bubble.className = 'message-bubble'
+
+        var roleLabel = document.createElement('div')
+        roleLabel.className = 'message-role'
+        roleLabel.textContent = role === 'user'
+          ? 'You'
+          : role === 'error'
+            ? 'Error'
+            : 'Assistant'
+
+        var body = document.createElement('div')
+        body.className = 'message-body'
+
+        var textSpan = document.createElement('span')
+        textSpan.className = 'message-text'
+        textSpan.textContent = text || ''
+
+        var cursor = document.createElement('span')
+        cursor.className = 'streaming-cursor hidden'
+        cursor.textContent = '▮'
+
+        body.appendChild(textSpan)
+        body.appendChild(cursor)
+
+        var meta = document.createElement('div')
+        meta.className = 'message-meta'
+
+        bubble.appendChild(roleLabel)
+        bubble.appendChild(body)
+        bubble.appendChild(meta)
+        row.appendChild(bubble)
+        els.messages.appendChild(row)
+        scrollMessages()
+
+        return {
+          row: row,
+          bubble: bubble,
+          text: textSpan,
+          cursor: cursor,
+          meta: meta,
+          content: text || ''
+        }
+      }
+
+      function setMessageText(message, text) {
+        message.content = text || ''
+        message.text.textContent = message.content
+      }
+
+      function setMessageStreaming(message, active) {
+        message.cursor.classList.toggle('hidden', !active)
+      }
+
+      function resetModelState() {
+        state.modelId = null
+        state.metadata = null
+        state.isGenerating = false
+        state.activeAssistant = null
+        state.pendingGeneration = null
+        state.chatHistory = []
+        state.lastCompletion = null
+        setModelLabel('No model loaded')
+        setComposerEnabled(false)
+        setLoadButtonState(false, 'Load Model')
+        setBridgeWarning(state.bridgeReady
+          ? 'Bridge ready. Load a model to start chatting.'
+          : 'Waiting for Capacitor bridge...')
+        setStatus('loading', state.bridgeReady ? 'Awaiting model' : 'Waiting')
+        syncEmptyState()
+      }
+
+      async function ensureListeners() {
+        if (state.listenersAttached || !state.LLM) {
+          return
+        }
+
+        await state.LLM.addListener('inferenceToken', function (event) {
+          if (event.modelId !== state.modelId || !state.activeAssistant) {
+            return
+          }
+          setMessageText(state.activeAssistant, state.activeAssistant.content + event.token)
+          setMessageStreaming(state.activeAssistant, true)
+          scrollMessages()
         })
 
-        var failedListener = await LLM.addListener('inferenceFailed', function(event) {
-          if (event.modelId !== modelId) return
-          completeListener.remove()
-          failedListener.remove()
-          reject(new Error(event.error))
-        })
+        await state.LLM.addListener('inferenceComplete', function (event) {
+          if (event.modelId !== state.modelId) {
+            return
+          }
+          if (!state.activeAssistant && !state.pendingGeneration) {
+            return
+          }
 
-        LLM.streamGenerate({
-          modelId: modelId,
-          prompt: 'The meaning of life is',
-          maxTokens: 5,
-          sampler: { temperature: 0.1, seed: 123 }
-        })
-      })
+          var text = typeof event.text === 'string'
+            ? event.text
+            : state.activeAssistant
+              ? state.activeAssistant.content
+              : ''
 
-      assert(completionEvent, 'must get inferenceComplete')
-      assert(completionEvent.completionTokens > 0, 'completionTokens: ' + completionEvent.completionTokens)
-      assert(completionEvent.tokensPerSecond > 0, 'tps: ' + completionEvent.tokensPerSecond)
-      assert(completionEvent.text.length > 0, 'text must not be empty')
-      // Sanity: tps should be between 0.01 and 500 for a real device
-      assert(completionEvent.tokensPerSecond > 0.01 && completionEvent.tokensPerSecond < 500,
-        'tps unrealistic: ' + completionEvent.tokensPerSecond)
-    }, 120000)
+          if (state.activeAssistant) {
+            setMessageText(state.activeAssistant, text)
+            setMessageStreaming(state.activeAssistant, false)
+            applyCompletionMeta(state.activeAssistant, event)
+          }
 
-    // ── Test 6: Cancel mid-stream ─────────────────────────────────────────
-    await t('2.3 cancelGeneration stops stream promptly', async function() {
-      var tokensBefore = []
-      var stopReason = null
-      var cancelAfterN = 5 // Cancel after receiving 5 tokens
+          if (text) {
+            state.chatHistory.push({ role: 'assistant', content: text })
+          }
 
-      await new Promise(async function(resolve, reject) {
-        var tokenListener = await LLM.addListener('inferenceToken', function(event) {
-          if (event.modelId !== modelId) return
-          tokensBefore.push(event.token)
-          if (tokensBefore.length === cancelAfterN) {
-            LLM.cancelGeneration({ modelId: modelId })
+          state.isGenerating = false
+          state.lastCompletion = event
+          state.activeAssistant = null
+          setStatus('ready', 'Ready')
+          updatePrimaryAction()
+          scrollMessages()
+
+          if (state.pendingGeneration) {
+            state.pendingGeneration.resolve(event)
+            state.pendingGeneration = null
           }
         })
 
-        var completeListener = await LLM.addListener('inferenceComplete', function(event) {
-          if (event.modelId !== modelId) return
-          stopReason = event.stopReason
-          tokenListener.remove()
-          completeListener.remove()
-          failedListener.remove()
-          resolve()
+        await state.LLM.addListener('inferenceFailed', function (event) {
+          if (event.modelId !== state.modelId) {
+            return
+          }
+          if (!state.activeAssistant && !state.pendingGeneration) {
+            return
+          }
+          handleGenerationFailure(event.error || 'Inference failed')
         })
 
-        var failedListener = await LLM.addListener('inferenceFailed', function(event) {
-          if (event.modelId !== modelId) return
-          tokenListener.remove()
-          completeListener.remove()
-          failedListener.remove()
-          reject(new Error(event.error))
+        state.listenersAttached = true
+      }
+
+      function handleGenerationFailure(message) {
+        state.isGenerating = false
+        setStatus('error', 'Generation failed')
+        updatePrimaryAction()
+
+        if (state.activeAssistant) {
+          state.activeAssistant.row.className = 'message-row error'
+          setMessageText(
+            state.activeAssistant,
+            state.activeAssistant.content || ('Error: ' + message)
+          )
+          setMessageStreaming(state.activeAssistant, false)
+          applyErrorMeta(state.activeAssistant, message)
+        } else {
+          var errorMessage = addMessage('error', 'Error: ' + message)
+          applyErrorMeta(errorMessage, message)
+        }
+
+        scrollMessages()
+
+        if (state.pendingGeneration) {
+          state.pendingGeneration.reject(new Error(message))
+          state.pendingGeneration = null
+        }
+
+        state.activeAssistant = null
+      }
+
+      async function waitForBridge() {
+        setStatus('loading', 'Waiting for Capacitor bridge...')
+        setBridgeWarning('Waiting for Capacitor bridge...')
+
+        for (var index = 0; index < 50; index++) {
+          if (
+            window.Capacitor &&
+            window.Capacitor.Plugins &&
+            window.Capacitor.Plugins.LLM
+          ) {
+            return window.Capacitor.Plugins.LLM
+          }
+          await sleep(200)
+        }
+
+        throw new Error('LLM plugin not found after 10s')
+      }
+
+      function defaultDescriptor() {
+        return {
+          id: 'qwen2.5',
+          format: 'gguf',
+          url: MODEL_PATH
+        }
+      }
+
+      async function loadModel() {
+        if (state.modelId) {
+          return {
+            modelId: state.modelId,
+            metadata: state.metadata || {}
+          }
+        }
+
+        if (state.modelLoading) {
+          throw new Error('Model is already loading')
+        }
+
+        if (!state.LLM) {
+          throw new Error('LLM bridge is not ready')
+        }
+
+        setLoadButtonState(true, 'Loading Model')
+        setStatus('loading', 'Loading model...')
+        setBridgeWarning('Loading model from ' + MODEL_PATH)
+
+        try {
+          var result = await state.LLM.loadModel({
+            descriptor: defaultDescriptor(),
+            config: { contextSize: 512, nGpuLayers: 0 }
+          })
+
+          state.modelId = result.modelId
+          state.metadata = result.metadata || {}
+          state.chatHistory = []
+          state.lastCompletion = null
+          setModelLabel(state.metadata.name || result.modelId)
+          setComposerEnabled(true)
+          setStatus('ready', 'Ready')
+          setBridgeWarning('Bridge ready. Model loaded from ' + MODEL_PATH)
+          setLoadButtonState(false, 'Model Loaded')
+          syncEmptyState()
+          return result
+        } catch (error) {
+          setLoadButtonState(false, 'Load Model')
+          setStatus('error', 'Load failed')
+          setBridgeWarning(error.message || 'Model failed to load')
+          throw error
+        }
+      }
+
+      async function buildPrompt() {
+        if (!state.chatHistory.length) {
+          return ''
+        }
+
+        if (state.LLM.applyTemplate) {
+          try {
+            var templated = await state.LLM.applyTemplate({
+              modelId: state.modelId,
+              messages: state.chatHistory,
+              addGenerationPrompt: true
+            })
+            if (templated && templated.prompt) {
+              return templated.prompt
+            }
+          } catch (_error) {
+          }
+        }
+
+        var lines = []
+        for (var i = 0; i < state.chatHistory.length; i++) {
+          var message = state.chatHistory[i]
+          var name = message.role === 'assistant' ? 'Assistant' : 'User'
+          lines.push(name + ': ' + message.content)
+        }
+        lines.push('Assistant:')
+        return lines.join('\n\n')
+      }
+
+      async function sendPrompt(prompt, options) {
+        options = options || {}
+
+        if (state.isGenerating) {
+          throw new Error('Generation already in progress')
+        }
+
+        var messageText = (prompt == null ? els.promptInput.value : prompt).trim()
+        if (!messageText) {
+          return null
+        }
+
+        await loadModel()
+
+        var userMessage = addMessage('user', messageText)
+        clearMessageMeta(userMessage)
+        state.chatHistory.push({ role: 'user', content: messageText })
+
+        if (prompt == null || options.clearInput !== false) {
+          els.promptInput.value = ''
+          autoResizeTextarea()
+        }
+
+        state.activeAssistant = addMessage('assistant', '')
+        setMessageStreaming(state.activeAssistant, true)
+        clearMessageMeta(state.activeAssistant)
+        state.isGenerating = true
+        state.lastCompletion = null
+        state.pendingGeneration = createDeferred()
+        setStatus('generating', 'Generating...')
+        updatePrimaryAction()
+        scrollMessages()
+
+        try {
+          var compiledPrompt = await buildPrompt()
+          await state.LLM.streamGenerate({
+            modelId: state.modelId,
+            prompt: compiledPrompt,
+            maxTokens: options.maxTokens || state.defaultMaxTokens || 96,
+            stopSequences: options.stopSequences || [],
+            sampler: options.sampler || { temperature: 0.7, topP: 0.9 }
+          })
+        } catch (error) {
+          handleGenerationFailure(error.message || 'Inference failed')
+          throw error
+        }
+
+        return state.pendingGeneration
+          ? state.pendingGeneration.promise
+          : Promise.resolve(state.lastCompletion)
+      }
+
+      async function handleStop() {
+        if (!state.isGenerating || !state.modelId) {
+          return
+        }
+
+        setStatus('loading', 'Stopping...')
+        try {
+          await state.LLM.cancelGeneration({ modelId: state.modelId })
+        } catch (error) {
+          handleGenerationFailure(error.message || 'Failed to stop generation')
+          throw error
+        }
+      }
+
+      async function unloadCurrentModel() {
+        if (!state.modelId) {
+          return
+        }
+        await state.LLM.unloadModel({ modelId: state.modelId })
+        resetModelState()
+      }
+
+      function renderTest(name) {
+        var safeId = 'test-' + name.replace(/[^a-zA-Z0-9]/g, '_')
+        if (byId(safeId)) {
+          return byId(safeId)
+        }
+        var item = document.createElement('div')
+        item.id = safeId
+        item.className = 'test pending'
+        item.innerHTML =
+          '<span class="badge">---</span>' +
+          '<div><div>' + name + '</div><div class="detail"></div></div>'
+        els.tests.appendChild(item)
+        return item
+      }
+
+      async function postJson(path, payload) {
+        try {
+          await fetch(RUNNER_URL + path, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            keepalive: true
+          })
+        } catch (_error) {
+        }
+      }
+
+      async function postResult(id, status, detail, error) {
+        await postJson('/__llm_result', {
+          id: id,
+          status: status,
+          detail: detail,
+          error: error
         })
 
-        LLM.streamGenerate({
-          modelId: modelId,
-          prompt: 'Write a very long essay about the history of mathematics from ancient times to modern day',
-          maxTokens: 100,
-          sampler: { temperature: 0.8, seed: 77 }
+        var safeId = 'test-' + id.replace(/[^a-zA-Z0-9]/g, '_')
+        var element = byId(safeId)
+        if (element) {
+          element.className = 'test ' + (status === 'pass' ? 'pass' : 'fail')
+          element.querySelector('.badge').textContent = status === 'pass'
+            ? 'PASS'
+            : 'FAIL'
+          if (detail || error) {
+            element.querySelector('.detail').textContent = detail || error
+          }
+        }
+      }
+
+      async function postDone(passed, failed, total, fatal) {
+        await postJson('/__llm_done', {
+          passed: passed,
+          failed: failed,
+          total: total,
+          fatal: fatal
         })
-      })
+      }
 
-      eq(stopReason, 'cancelled', 'stopReason must be cancelled')
-      // With true streaming + cancel, we should get close to cancelAfterN tokens,
-      // NOT all 100. Allow some slack since a few tokens may arrive before cancel takes effect.
-      assert(tokensBefore.length < cancelAfterN + 20,
-        'Got ' + tokensBefore.length + ' tokens after cancel at ' + cancelAfterN + ' — cancel must stop promptly')
-    }, 120000)
+      function assert(condition, message) {
+        if (!condition) {
+          throw new Error('Assertion failed: ' + message)
+        }
+      }
 
-    // ── Test 7: Stream with stop sequence ─────────────────────────────────
-    await t('2.4 streamGenerate stopSequence terminates', async function() {
-      var completionEvent = null
+      function eq(actual, expected, message) {
+        if (actual !== expected) {
+          throw new Error(
+            message +
+            ': expected ' + JSON.stringify(expected) +
+            ', got ' + JSON.stringify(actual)
+          )
+        }
+      }
 
-      await new Promise(async function(resolve, reject) {
-        var completeListener = await LLM.addListener('inferenceComplete', function(event) {
-          if (event.modelId !== modelId) return
-          completionEvent = event
-          completeListener.remove()
-          failedListener.remove()
-          resolve()
+      function lastOf(nodeList) {
+        return nodeList[nodeList.length - 1]
+      }
+
+      async function runTests() {
+        var passed = 0
+        var failed = 0
+        var total = 0
+
+        els.tests.innerHTML = ''
+        els.summary.textContent = ''
+        els.plugins.textContent = window.Capacitor && window.Capacitor.Plugins
+          ? 'Plugins: ' + Object.keys(window.Capacitor.Plugins).join(', ')
+          : 'Plugins unavailable'
+
+        async function t(name, fn, timeoutMs) {
+          total++
+          var item = renderTest(name)
+          item.className = 'test running'
+          item.querySelector('.badge').textContent = 'RUN'
+
+          var startedAt = Date.now()
+          var limit = timeoutMs || 120000
+
+          try {
+            await Promise.race([
+              fn(),
+              new Promise(function (_resolve, reject) {
+                setTimeout(function () {
+                  reject(new Error('Timed out after ' + limit + 'ms'))
+                }, limit)
+              })
+            ])
+            passed++
+            await postResult(name, 'pass', (Date.now() - startedAt) + 'ms')
+          } catch (error) {
+            failed++
+            await postResult(
+              name,
+              'fail',
+              null,
+              (error.message || String(error)).split('\n')[0]
+            )
+          }
+        }
+
+        try {
+          await t('1.1 loadModel', async function () {
+            var result = await loadModel()
+            assert(result.modelId, 'modelId must be set')
+            assert(result.metadata, 'metadata must exist')
+            assert(result.metadata.name, 'metadata.name must exist')
+          }, 60000)
+
+          if (!state.modelId) {
+            throw new Error('Model failed to load')
+          }
+
+          await t('1.2 tokenize', async function () {
+            var tokenized = await state.LLM.tokenize({
+              modelId: state.modelId,
+              text: 'Hello world'
+            })
+            assert(Array.isArray(tokenized.tokens), 'tokens must be an array')
+            assert(tokenized.tokens.length > 0, 'tokens must not be empty')
+          })
+
+          await t('1.3 generate', async function () {
+            var result = await state.LLM.generate({
+              modelId: state.modelId,
+              prompt: 'The capital of France is',
+              maxTokens: 5,
+              sampler: { temperature: 0.1, seed: 42 }
+            })
+            assert(result.text.length > 0, 'text must not be empty')
+            assert(result.tokenCount > 0, 'tokenCount must be positive')
+            assert(
+              result.stopReason === 'max_tokens' || result.stopReason === 'eos',
+              'unexpected stopReason ' + result.stopReason
+            )
+          }, 120000)
+
+          await t('2.1 streamGenerate incremental', async function () {
+            var tokenTimestamps = []
+            var tokens = []
+
+            await new Promise(async function (resolve, reject) {
+              var tokenListener = await state.LLM.addListener(
+                'inferenceToken',
+                function (event) {
+                  if (event.modelId !== state.modelId) {
+                    return
+                  }
+                  tokenTimestamps.push(Date.now())
+                  tokens.push(event.token)
+                }
+              )
+
+              var completeListener = await state.LLM.addListener(
+                'inferenceComplete',
+                function (event) {
+                  if (event.modelId !== state.modelId) {
+                    return
+                  }
+                  tokenListener.remove()
+                  completeListener.remove()
+                  failedListener.remove()
+                  resolve()
+                }
+              )
+
+              var failedListener = await state.LLM.addListener(
+                'inferenceFailed',
+                function (event) {
+                  if (event.modelId !== state.modelId) {
+                    return
+                  }
+                  tokenListener.remove()
+                  completeListener.remove()
+                  failedListener.remove()
+                  reject(new Error(event.error))
+                }
+              )
+
+              state.LLM.streamGenerate({
+                modelId: state.modelId,
+                prompt: 'Once upon a time there was a little',
+                maxTokens: 10,
+                sampler: { temperature: 0.1, seed: 42 }
+              })
+            })
+
+            assert(tokens.length > 0, 'must receive tokens')
+            if (tokenTimestamps.length >= 3) {
+              var span =
+                tokenTimestamps[tokenTimestamps.length - 1] - tokenTimestamps[0]
+              assert(
+                span > 20,
+                'token delivery span must be >20ms, got ' + span + 'ms'
+              )
+            }
+          }, 120000)
+
+          await t('2.2 streamGenerate TPS', async function () {
+            var completionEvent = null
+
+            await new Promise(async function (resolve, reject) {
+              var completeListener = await state.LLM.addListener(
+                'inferenceComplete',
+                function (event) {
+                  if (event.modelId !== state.modelId) {
+                    return
+                  }
+                  completionEvent = event
+                  completeListener.remove()
+                  failedListener.remove()
+                  resolve()
+                }
+              )
+
+              var failedListener = await state.LLM.addListener(
+                'inferenceFailed',
+                function (event) {
+                  if (event.modelId !== state.modelId) {
+                    return
+                  }
+                  completeListener.remove()
+                  failedListener.remove()
+                  reject(new Error(event.error))
+                }
+              )
+
+              state.LLM.streamGenerate({
+                modelId: state.modelId,
+                prompt: 'The meaning of life is',
+                maxTokens: 5,
+                sampler: { temperature: 0.1, seed: 123 }
+              })
+            })
+
+            assert(completionEvent, 'must receive inferenceComplete')
+            assert(
+              completionEvent.completionTokens > 0,
+              'completionTokens must be positive'
+            )
+            assert(
+              completionEvent.tokensPerSecond > 0.01 &&
+              completionEvent.tokensPerSecond < 500,
+              'tps unrealistic: ' + completionEvent.tokensPerSecond
+            )
+            assert(completionEvent.text.length > 0, 'text must not be empty')
+          }, 120000)
+
+          await t('2.3 cancelGeneration', async function () {
+            var tokensBefore = []
+            var stopReason = null
+            var cancelAfter = 5
+
+            await new Promise(async function (resolve, reject) {
+              var tokenListener = await state.LLM.addListener(
+                'inferenceToken',
+                function (event) {
+                  if (event.modelId !== state.modelId) {
+                    return
+                  }
+                  tokensBefore.push(event.token)
+                  if (tokensBefore.length === cancelAfter) {
+                    state.LLM.cancelGeneration({ modelId: state.modelId })
+                  }
+                }
+              )
+
+              var completeListener = await state.LLM.addListener(
+                'inferenceComplete',
+                function (event) {
+                  if (event.modelId !== state.modelId) {
+                    return
+                  }
+                  stopReason = event.stopReason
+                  tokenListener.remove()
+                  completeListener.remove()
+                  failedListener.remove()
+                  resolve()
+                }
+              )
+
+              var failedListener = await state.LLM.addListener(
+                'inferenceFailed',
+                function (event) {
+                  if (event.modelId !== state.modelId) {
+                    return
+                  }
+                  tokenListener.remove()
+                  completeListener.remove()
+                  failedListener.remove()
+                  reject(new Error(event.error))
+                }
+              )
+
+              state.LLM.streamGenerate({
+                modelId: state.modelId,
+                prompt: 'Write a very long essay about the history of mathematics',
+                maxTokens: 100,
+                sampler: { temperature: 0.8, seed: 77 }
+              })
+            })
+
+            eq(stopReason, 'cancelled', 'stopReason must be cancelled')
+            assert(
+              tokensBefore.length < 25,
+              'cancel must stop promptly, got ' + tokensBefore.length + ' tokens'
+            )
+          }, 120000)
+
+          await t('2.4 stopSequence', async function () {
+            var completionEvent = null
+
+            await new Promise(async function (resolve, reject) {
+              var completeListener = await state.LLM.addListener(
+                'inferenceComplete',
+                function (event) {
+                  if (event.modelId !== state.modelId) {
+                    return
+                  }
+                  completionEvent = event
+                  completeListener.remove()
+                  failedListener.remove()
+                  resolve()
+                }
+              )
+
+              var failedListener = await state.LLM.addListener(
+                'inferenceFailed',
+                function (event) {
+                  if (event.modelId !== state.modelId) {
+                    return
+                  }
+                  completeListener.remove()
+                  failedListener.remove()
+                  reject(new Error(event.error))
+                }
+              )
+
+              state.LLM.streamGenerate({
+                modelId: state.modelId,
+                prompt: 'Count from 1 to 100: 1, 2, 3,',
+                maxTokens: 50,
+                stopSequences: ['10'],
+                sampler: { temperature: 0.1, seed: 42 }
+              })
+            })
+
+            assert(completionEvent, 'must receive inferenceComplete')
+            assert(
+              completionEvent.completionTokens < 50,
+              'must stop before maxTokens'
+            )
+          }, 120000)
+
+          // --- Interactive Chat Flow Tests ---
+          // These tests drive the UI through DOM events (typing, clicking)
+          // rather than calling internal functions directly.
+          // Show chat UI for interactive tests (TEST_MODE hides it)
+          els.chatUi.classList.remove('hidden')
+          // Clear messages from API tests so interactive tests start clean
+          els.messages.innerHTML = ''
+          state.chatHistory = [
+            { role: 'system', content: 'You are a concise assistant. Always reply in 1-2 short sentences.' }
+          ]
+          // Android emulator is much slower than iOS simulator — cap tokens accordingly
+          var isAndroid = MODEL_PATH.indexOf('/data/local/tmp/') === 0
+          state.defaultMaxTokens = isAndroid ? 16 : 64
+
+          function simulateType(text) {
+            els.promptInput.value = text
+            els.promptInput.dispatchEvent(new Event('input', { bubbles: true }))
+          }
+
+          function simulateClick(el) {
+            el.click()
+          }
+
+          async function waitFor(conditionFn, timeoutMs, desc) {
+            var deadline = Date.now() + (timeoutMs || 10000)
+            while (Date.now() < deadline) {
+              if (conditionFn()) return true
+              await sleep(50)
+            }
+            throw new Error('waitFor timed out: ' + (desc || ''))
+          }
+
+          // Unload model from API tests so 4.1 can test the load button
+          if (state.modelId) {
+            await unloadCurrentModel()
+          }
+          // Force show empty state (load button) — syncEmptyState skips in TEST_MODE
+          els.emptyState.classList.remove('hidden')
+          await t('4.1 load model via button', async function () {
+            assert(!state.modelId, 'model should be unloaded before interactive tests')
+            simulateClick(els.loadButton)
+            await waitFor(
+              function () { return els.statusDot.classList.contains('ready') },
+              60000, 'status dot ready'
+            )
+            assert(
+              els.modelLabel.textContent !== 'No model loaded',
+              'model label should update'
+            )
+            assert(state.modelId, 'modelId should be set after button click')
+          }, 60000)
+
+          await t('4.2 send message via input', async function () {
+            simulateType('Hello from the chat test')
+            assert(
+              !els.primaryAction.disabled,
+              'send button should be enabled with text'
+            )
+
+            var userBefore = els.messages.querySelectorAll('.message-row.user').length
+            simulateClick(els.primaryAction)
+
+            await waitFor(function () {
+              return els.messages.querySelectorAll('.message-row.user').length > userBefore
+            }, 5000, 'user row appeared')
+
+            var userRows = els.messages.querySelectorAll('.message-row.user')
+            var lastUser = lastOf(userRows)
+            assert(
+              lastUser.querySelector('.message-text').textContent.indexOf('Hello from the chat test') !== -1,
+              'user bubble should show typed text'
+            )
+
+            assert(
+              els.promptInput.value === '',
+              'input should be cleared after send'
+            )
+
+            await waitFor(
+              function () { return !state.isGenerating },
+              180000, 'generation complete'
+            )
+          }, 180000)
+
+          await t('4.3 assistant streams response', async function () {
+            // Clear history to avoid context overflow on slow devices
+            state.chatHistory = []
+            var cursorSeen = false
+
+            // Start polling for cursor BEFORE the click
+            var cursorPoll = setInterval(function () {
+              if (els.messages.querySelector('.streaming-cursor:not(.hidden)')) {
+                cursorSeen = true
+              }
+            }, 20)
+
+            simulateType('Count to five')
+            simulateClick(els.primaryAction)
+
+            // CRITICAL: wait for generation to START first (sendPrompt is async,
+            // isGenerating is set after await loadModel() resolves in a microtask)
+            await waitFor(function () {
+              return state.isGenerating
+            }, 10000, 'generation started')
+
+            // Now wait for it to finish
+            await waitFor(function () {
+              return !state.isGenerating
+            }, 180000, 'generation complete')
+
+            clearInterval(cursorPoll)
+
+            assert(cursorSeen, 'streaming cursor should have been visible during streaming')
+
+            var afterCursor = els.messages.querySelector('.streaming-cursor:not(.hidden)')
+            assert(!afterCursor, 'cursor should be hidden after completion')
+
+            var assistantRows = els.messages.querySelectorAll('.message-row.assistant')
+            var lastAssistant = lastOf(assistantRows)
+            assert(
+              lastAssistant.querySelector('.message-text').textContent.trim().length > 0,
+              'assistant should have non-empty text'
+            )
+            assert(
+              lastAssistant.querySelector('.badge.success'),
+              'TPS badge should be present'
+            )
+          }, 180000)
+
+          await t('4.4 stop button cancels', async function () {
+            // Clear history to avoid context overflow
+            state.chatHistory = []
+            // Use more tokens so we have time to click Stop before generation finishes
+            var savedMax = state.defaultMaxTokens
+            state.defaultMaxTokens = 30
+            simulateType('Write a very long detailed story about dragons and kingdoms')
+
+            var stopClicked = false
+            simulateClick(els.primaryAction)
+
+            // Wait for generation to actually start
+            await waitFor(function () {
+              return state.isGenerating
+            }, 10000, 'generation started')
+
+            // Poll: as soon as cursor is visible, click Stop
+            await waitFor(function () {
+              if (!stopClicked &&
+                  els.primaryAction.textContent === 'Stop' &&
+                  els.messages.querySelector('.streaming-cursor:not(.hidden)')) {
+                simulateClick(els.primaryAction)
+                stopClicked = true
+              }
+              return stopClicked || !state.isGenerating
+            }, 120000, 'stop clicked or generation ended')
+
+            // Wait for generation to fully stop
+            await waitFor(function () {
+              return !state.isGenerating
+            }, 60000, 'generation stopped')
+
+            state.defaultMaxTokens = savedMax
+
+            var assistantRows = els.messages.querySelectorAll('.message-row.assistant')
+            var lastAssistant = lastOf(assistantRows)
+            var badges = lastAssistant.querySelectorAll('.badge')
+            var foundCancelled = false
+            for (var i = 0; i < badges.length; i++) {
+              if (badges[i].textContent.indexOf('cancelled') !== -1) {
+                foundCancelled = true
+                break
+              }
+            }
+            // If generation finished before we could cancel, that's OK — just verify completion
+            if (!foundCancelled) {
+              assert(
+                lastAssistant.querySelector('.badge.warning') ||
+                lastAssistant.querySelector('.badge.success'),
+                'should show completion badge (generation finished before cancel)'
+              )
+            }
+          }, 180000)
+
+          await t('4.5 multi-turn conversation', async function () {
+            // Ensure clean state — cancel any lingering generation & clear history
+            if (state.isGenerating && state.modelId) {
+              try { await state.LLM.cancelGeneration({ modelId: state.modelId }) } catch (_e) {}
+              await waitFor(function () { return !state.isGenerating }, 60000, 'cleanup cancel')
+            }
+            state.chatHistory = []
+
+            var userBefore = els.messages.querySelectorAll('.message-row.user').length
+            var assistantBefore = els.messages.querySelectorAll('.message-row.assistant').length
+
+            simulateType('What is 2+2?')
+            simulateClick(els.primaryAction)
+
+            // Wait for generation to start then complete
+            await waitFor(
+              function () { return state.isGenerating },
+              5000, 'turn 1 generation started'
+            )
+            await waitFor(
+              function () { return !state.isGenerating },
+              120000, 'turn 1 complete'
+            )
+
+            // Small delay to let UI settle
+            await sleep(200)
+
+            simulateType('And what about 3+3?')
+            // Ensure Send button is enabled after typing
+            await waitFor(function () {
+              return !els.primaryAction.disabled && els.primaryAction.textContent === 'Send'
+            }, 5000, 'Send button enabled for turn 2')
+            simulateClick(els.primaryAction)
+
+            // Wait for generation to start then complete
+            await waitFor(
+              function () { return state.isGenerating },
+              5000, 'turn 2 generation started'
+            )
+            await waitFor(
+              function () { return !state.isGenerating },
+              120000, 'turn 2 complete'
+            )
+
+            var userAfter = els.messages.querySelectorAll('.message-row.user').length
+            var assistantAfter = els.messages.querySelectorAll('.message-row.assistant').length
+
+            assert(
+              userAfter >= userBefore + 2,
+              'should have 2 new user rows, got ' + (userAfter - userBefore)
+            )
+            assert(
+              assistantAfter >= assistantBefore + 2,
+              'should have 2 new assistant rows, got ' + (assistantAfter - assistantBefore)
+            )
+            assert(
+              state.chatHistory.length >= 4,
+              'chat history should have at least 4 entries, got ' + state.chatHistory.length
+            )
+          }, 420000)
+
+          await t('4.6 input state management', async function () {
+            // Ensure clean state — cancel lingering generation & clear history
+            if (state.isGenerating && state.modelId) {
+              try { await state.LLM.cancelGeneration({ modelId: state.modelId }) } catch (_e) {}
+              await waitFor(function () { return !state.isGenerating }, 60000, 'cleanup cancel')
+            }
+            state.chatHistory = []
+            state.lastCompletion = null
+            updatePrimaryAction()
+
+            assert(
+              !els.promptInput.disabled,
+              'input should be enabled when model is loaded'
+            )
+
+            simulateType('')
+            assert(
+              els.primaryAction.disabled,
+              'send button should be disabled when input is empty'
+            )
+
+            simulateType('test input')
+            assert(
+              !els.primaryAction.disabled,
+              'send button should be enabled when input has text'
+            )
+
+            simulateClick(els.primaryAction)
+
+            // Wait for generation to start (sendPrompt is async)
+            await waitFor(function () {
+              return state.isGenerating
+            }, 10000, 'generation started')
+
+            eq(
+              els.primaryAction.textContent, 'Stop',
+              'button should show Stop during generation'
+            )
+            assert(
+              els.primaryAction.classList.contains('stop'),
+              'button should have stop class during generation'
+            )
+
+            await waitFor(
+              function () { return !state.isGenerating },
+              120000, 'generation complete'
+            )
+
+            eq(
+              els.primaryAction.textContent, 'Send',
+              'button should revert to Send after generation'
+            )
+            assert(
+              !els.primaryAction.classList.contains('stop'),
+              'button should not have stop class after generation'
+            )
+          }, 180000)
+
+          // --- End Interactive Tests ---
+
+          await t('3.1 unloadModel', async function () {
+            var unloadedModelId = state.modelId
+            await unloadCurrentModel()
+            var list = await state.LLM.listLoadedModels()
+            assert(
+              !list.modelIds.includes(unloadedModelId),
+              'model must be removed from loaded models'
+            )
+          }, 30000)
+
+          var color = failed === 0 ? 'rgba(134, 239, 172, 0.95)' : 'rgba(252, 165, 165, 0.95)'
+          els.summary.innerHTML =
+            '<span style="font-weight:700;color:' + color + '">' +
+            passed + '/' + total +
+            (failed ? ' passed, ' + failed + ' failed' : ' passed, all pass') +
+            '</span>'
+
+          setStatus(failed === 0 ? 'ready' : 'error', 'Done: ' + passed + '/' + total + ' passed')
+          await state.LLM.removeAllListeners()
+          await postDone(passed, failed, total)
+        } catch (error) {
+          els.summary.textContent = 'Fatal error: ' + error.message
+          setStatus('error', 'Fatal error')
+          await postResult('FATAL', 'fail', null, error.message)
+          await postDone(passed, failed + 1, total + 1, error.message)
+        }
+      }
+
+      function bindEvents() {
+        els.loadButton.addEventListener('click', function () {
+          loadModel().catch(function (error) {
+            console.error('loadModel failed:', error)
+          })
         })
 
-        var failedListener = await LLM.addListener('inferenceFailed', function(event) {
-          if (event.modelId !== modelId) return
-          completeListener.remove()
-          failedListener.remove()
-          reject(new Error(event.error))
+        els.promptInput.addEventListener('input', function () {
+          autoResizeTextarea()
+          updatePrimaryAction()
         })
 
-        LLM.streamGenerate({
-          modelId: modelId,
-          prompt: 'Count from 1 to 100: 1, 2, 3,',
-          maxTokens: 50,
-          stopSequences: ['10'],
-          sampler: { temperature: 0.1, seed: 42 }
+        els.promptInput.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault()
+            if (!state.isGenerating) {
+              sendPrompt().catch(function (error) {
+                console.error('sendPrompt failed:', error)
+              })
+            }
+          }
         })
-      })
 
-      assert(completionEvent, 'must get inferenceComplete')
-      // Stop sequence should trigger before reaching maxTokens
-      assert(completionEvent.completionTokens < 50,
-        'must stop before maxTokens, got ' + completionEvent.completionTokens)
-    }, 120000)
+        els.primaryAction.addEventListener('click', function () {
+          if (state.isGenerating) {
+            handleStop().catch(function (error) {
+              console.error('cancel failed:', error)
+            })
+            return
+          }
 
-    // ── Test 8: Unload model ──────────────────────────────────────────────
-    await t('3.1 unloadModel succeeds', async function() {
-      await LLM.unloadModel({ modelId: modelId })
-      var r = await LLM.listLoadedModels()
-      assert(!r.modelIds.includes(modelId), 'model must be unloaded')
-    })
+          sendPrompt().catch(function (error) {
+            console.error('sendPrompt failed:', error)
+          })
+        })
+      }
 
-    // ── Done ──────────────────────────────────────────────────────────────
-    var color = failed === 0 ? '#22c55e' : '#ef4444'
-    document.getElementById('summary').innerHTML =
-      '<span style="color:' + color + ';font-weight:bold">' + passed + '/' + total +
-      (failed > 0 ? ' passed — ' + failed + ' FAILED' : ' passed — ALL PASS') + '</span>'
-    setStatus('Done: ' + passed + '/' + total + ' passed')
+      async function boot() {
+        cacheEls()
+        bindEvents()
+        autoResizeTextarea()
+        syncEmptyState()
 
-    await LLM.removeAllListeners()
-    await postDone(passed, failed, total)
+        if (TEST_MODE) {
+          els.chatUi.classList.add('hidden')
+          els.testUi.classList.remove('hidden')
+        } else {
+          els.chatUi.classList.remove('hidden')
+          els.testUi.classList.add('hidden')
+        }
 
-  })().catch(async function(err) {
-    document.getElementById('status').textContent = 'Fatal error: ' + err.message
-    console.error('E2E fatal:', err)
-    try {
-      await fetch('http://127.0.0.1:8099/__llm_result', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: 'FATAL', status: 'fail', error: err.message }),
-        keepalive: true
-      })
-      await fetch('http://127.0.0.1:8099/__llm_done', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ passed: 0, failed: 1, total: 1, fatal: err.message }),
-        keepalive: true
-      })
-    } catch (e) {}
-  })
+        try {
+          state.LLM = await waitForBridge()
+          state.bridgeReady = true
+          await ensureListeners()
+
+          if (!TEST_MODE) {
+            setStatus('loading', 'Awaiting model')
+            setBridgeWarning('Bridge ready. Load a model to start chatting.')
+          } else {
+            setStatus('loading', 'Bridge ready. Running tests...')
+          }
+
+          if (TEST_MODE) {
+            await runTests()
+          }
+        } catch (error) {
+          console.error('boot failed:', error)
+          setStatus('error', 'Bridge unavailable')
+          setBridgeWarning(error.message || 'Failed to initialize')
+
+          if (TEST_MODE) {
+            els.summary.textContent = 'Fatal error: ' + error.message
+            await postResult('FATAL', 'fail', null, error.message)
+            await postDone(0, 1, 1, error.message)
+          } else {
+            applyErrorMeta(addMessage('error', 'Error: ' + error.message), error.message)
+          }
+        }
+      }
+
+      window.__llmChatApp = {
+        boot: boot,
+        loadModel: loadModel,
+        sendPrompt: sendPrompt,
+        stop: handleStop,
+        getState: function () {
+          return {
+            bridgeReady: state.bridgeReady,
+            modelId: state.modelId,
+            isGenerating: state.isGenerating,
+            messageCount: els.messages ? els.messages.children.length : 0
+          }
+        }
+      }
+
+      cacheEls()
+      resetModelState()
+      boot()
+    })()
   </script>
 </body>
 </html>

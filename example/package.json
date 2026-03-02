@@ -1,11 +1,10 @@
 {
-  "name": "capacitor-llm-example",
+  "name": "llm-chat-example",
   "version": "1.0.0",
   "private": true,
-  "description": "E2E test app for capacitor-llm plugin",
+  "description": "LLM Chat example app for dust-llm-capacitor",
   "scripts": {
     "sync": "cap sync",
-    "android": "cap run android",
     "build:apk": "cd android && ./gradlew assembleDebug",
     "test:ios": "node test-e2e-ios.mjs",
     "test:android": "node test-e2e-android.mjs"
