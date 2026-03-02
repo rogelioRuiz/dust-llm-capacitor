@@ -385,7 +385,7 @@ node test-e2e-android.mjs
 
 ### What the test scripts auto-handle
 
-- Download [Qwen 2.5 1.5B Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF) Q4_K_M (~1.1 GB, cached in `test/models/`)
+- Download [Qwen 3.5 2B](https://huggingface.co/unsloth/Qwen3.5-2B-GGUF) Q4_K_M (~1.3 GB, cached in `test/models/`)
 - `cap add ios` / `cap add android` if platform directory is missing
 - iOS: patch deployment target to 16.0, SPM resolution
 - Android: patch Kotlin Gradle plugin, minSdk 26, cleartext HTTP for localhost
@@ -420,12 +420,12 @@ cd example && npm install
 
 #### 2. Download a GGUF model
 
-The E2E scripts auto-download [Qwen 2.5 1.5B Instruct Q4_K_M](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF) (~1.1 GB). To download it yourself:
+The E2E scripts auto-download [Qwen 3.5 2B Q4_K_M](https://huggingface.co/unsloth/Qwen3.5-2B-GGUF) (~1.3 GB). To download it yourself:
 
 ```bash
 mkdir -p test/models
-curl -L --progress-bar -o test/models/qwen2.5-1.5b-instruct-q4_k_m.gguf \
-  https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf
+curl -L --progress-bar -o test/models/Qwen3.5-2B-Q4_K_M.gguf \
+  https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf
 ```
 
 #### 3a. iOS
@@ -456,11 +456,11 @@ xcrun simctl install "$UDID" "$APP"
 # Copy the model into the app's Documents folder
 DATA_DIR=$(xcrun simctl get_app_container "$UDID" io.t6x.llmchat data)
 mkdir -p "$DATA_DIR/Documents"
-cp test/models/qwen2.5-1.5b-instruct-q4_k_m.gguf "$DATA_DIR/Documents/"
+cp test/models/Qwen3.5-2B-Q4_K_M.gguf "$DATA_DIR/Documents/"
 
 # Patch MODEL_PATH in the installed app to point to the simulator path
 BUNDLE_DIR=$(xcrun simctl get_app_container "$UDID" io.t6x.llmchat)
-sed -i '' "s|var MODEL_PATH = '.*'|var MODEL_PATH = '$DATA_DIR/Documents/qwen2.5-1.5b-instruct-q4_k_m.gguf'|" \
+sed -i '' "s|var MODEL_PATH = '.*'|var MODEL_PATH = '$DATA_DIR/Documents/Qwen3.5-2B-Q4_K_M.gguf'|" \
   "$BUNDLE_DIR/public/index.html"
 
 # Launch
@@ -475,7 +475,7 @@ npx cap add android
 npx cap sync android
 
 # Push model to device (MODEL_PATH in index.html defaults to /data/local/tmp/)
-adb push test/models/qwen2.5-1.5b-instruct-q4_k_m.gguf /data/local/tmp/
+adb push test/models/Qwen3.5-2B-Q4_K_M.gguf /data/local/tmp/
 
 # Build and install
 cd android && ./gradlew assembleDebug && cd ..

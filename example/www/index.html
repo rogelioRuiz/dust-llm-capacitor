@@ -700,7 +700,7 @@
       <div id="empty-state">
         <div id="empty-card">
           <div class="eyebrow">On-device inference</div>
-          <h1>Load a local Qwen 2.5 model</h1>
+          <h1>Load a local Qwen 3.5 model</h1>
           <p id="empty-copy">
             This example streams tokens directly from <code>dust-llm-capacitor</code>
             with no framework and no build step.
@@ -742,7 +742,7 @@
   <script src="capacitor.js"></script>
   <script>
     var TEST_MODE = false
-    var MODEL_PATH = '/data/local/tmp/qwen2.5-1.5b-instruct-q4_k_m.gguf'
+    var MODEL_PATH = '/data/local/tmp/Qwen3.5-2B-Q4_K_M.gguf'
     var RUNNER_URL = 'http://127.0.0.1:8099'
 
     ;(function () {
@@ -1093,7 +1093,7 @@
 
       function defaultDescriptor() {
         return {
-          id: 'qwen2.5',
+          id: 'qwen3.5',
           format: 'gguf',
           url: MODEL_PATH
         }

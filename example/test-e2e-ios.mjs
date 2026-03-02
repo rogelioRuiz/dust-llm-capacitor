@@ -30,8 +30,8 @@ const BUNDLE_ID    = 'io.t6x.llmchat'
 const RUNNER_PORT  = 8099
 const TOTAL_TESTS  = 14
 const TIMEOUT_MS   = 600_000  // 10 min — model loading + inference is slow
-const MODEL_NAME   = 'qwen2.5-1.5b-instruct-q4_k_m.gguf'
-const MODEL_URL    = 'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf'
+const MODEL_NAME   = 'Qwen3.5-2B-Q4_K_M.gguf'
+const MODEL_URL    = 'https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf'
 const MODEL_DIR    = path.join(ROOT_DIR, 'test/models')
 const MODEL_PATH   = path.join(MODEL_DIR, MODEL_NAME)
 const IOS_MIN_VERSION = '16'
@@ -183,7 +183,7 @@ function startResultServer() {
 // ─── Project setup (idempotent) ──────────────────────────────────────────────
 function ensureModel() {
   if (fs.existsSync(MODEL_PATH)) return
-  console.log(`  → Downloading model (${MODEL_NAME}, ~1.1 GB)...`)
+  console.log(`  → Downloading model (${MODEL_NAME}, ~1.3 GB)...`)
   fs.mkdirSync(MODEL_DIR, { recursive: true })
   execSync(`curl -L --progress-bar -o "${MODEL_PATH}" "${MODEL_URL}"`, {
     stdio: ['ignore', process.stderr, 'pipe'],

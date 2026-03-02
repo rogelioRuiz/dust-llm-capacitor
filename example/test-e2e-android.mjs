@@ -30,8 +30,8 @@ const RUNNER_PORT       = 8099
 const TOTAL_TESTS       = 14
 const TIMEOUT_MS        = 1_200_000  // 20 min — model loading is slow on emulator
 const ADB               = process.env.ADB_PATH || 'adb'
-const MODEL_NAME        = 'qwen2.5-1.5b-instruct-q4_k_m.gguf'
-const MODEL_URL         = 'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf'
+const MODEL_NAME        = 'Qwen3.5-2B-Q4_K_M.gguf'
+const MODEL_URL         = 'https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf'
 const MODEL_DIR         = path.join(ROOT_DIR, 'test/models')
 const LOCAL_MODEL_PATH  = path.join(MODEL_DIR, MODEL_NAME)
 const DEVICE_MODEL_PATH = `/data/local/tmp/${MODEL_NAME}`
@@ -133,7 +133,7 @@ function npx(args, opts = {}) {
 // ─── Project setup (idempotent) ──────────────────────────────────────────────
 function ensureModel() {
   if (fs.existsSync(LOCAL_MODEL_PATH)) return
-  console.log(`  → Downloading model (${MODEL_NAME}, ~1.1 GB)...`)
+  console.log(`  → Downloading model (${MODEL_NAME}, ~1.3 GB)...`)
   fs.mkdirSync(MODEL_DIR, { recursive: true })
   execSync(`curl -L --progress-bar -o "${LOCAL_MODEL_PATH}" "${MODEL_URL}"`, {
     stdio: ['ignore', process.stderr, 'pipe'],
