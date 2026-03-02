@@ -10,11 +10,11 @@
  *   - index.html POSTs __llm_result and __llm_done to this server
  *
  * Prerequisites:
- *   - Connected arm64 Android device
- *   - GGUF model at /data/local/tmp/tinyllama-1.1b-chat-v1.0.Q2_K.gguf
+ *   - Connected arm64 Android device or emulator
+ *   - GGUF model auto-downloaded on first run
  *
  * Usage:
- *   ADB_PATH=/path/to/adb ANDROID_SERIAL=xxx node test-e2e-android.mjs
+ *   node test-e2e-android.mjs
  */
 
 import { execSync } from 'child_process'
@@ -24,6 +24,7 @@ import { fileURLToPath } from 'url'
 import fs from 'fs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const ROOT_DIR = path.resolve(__dirname, '..')
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const BUNDLE_ID   = 'io.t6x.llm.test'
@@ -31,6 +32,11 @@ const RUNNER_PORT = 8099
 const TOTAL_TESTS = 8
 const TIMEOUT_MS  = 300_000  // 5 min — model loading is slow
 const ADB         = process.env.ADB_PATH || 'adb'
+const MODEL_NAME  = 'tinyllama-1.1b-chat-v1.0.Q2_K.gguf'
+const MODEL_URL   = 'https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q2_K.gguf'
+const MODEL_DIR   = path.join(ROOT_DIR, 'test/models')
+const MODEL_PATH  = path.join(MODEL_DIR, MODEL_NAME)
+const DEVICE_MODEL_PATH = `/data/local/tmp/${MODEL_NAME}`
 
 // ─── Test runner state ────────────────────────────────────────────────────────
 let passedTests = 0, failedTests = 0
@@ -62,6 +68,31 @@ function getConnectedDevice() {
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
+
+// ─── Project setup (idempotent) ──────────────────────────────────────────────
+function ensureModel() {
+  if (fs.existsSync(MODEL_PATH)) return
+  console.log(`  → Downloading model (${MODEL_NAME})...`)
+  fs.mkdirSync(MODEL_DIR, { recursive: true })
+  execSync(`curl -L -o "${MODEL_PATH}" "${MODEL_URL}"`, {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: 600_000,
+  })
+}
+
+function ensureCapSync() {
+  console.log('  → cap sync android...')
+  const nodePath = execSync('which node', { encoding: 'utf8' }).trim()
+  const npmPath = execSync('which npm', { encoding: 'utf8' }).trim()
+  const npxPath = path.join(path.dirname(npmPath), 'npx')
+  execSync(`${npxPath} cap sync android`, {
+    cwd: __dirname,
+    encoding: 'utf8',
+    timeout: 60000,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, PATH: `${path.dirname(nodePath)}:${process.env.PATH}` }
+  })
+}
 
 // ─── HTTP result collector ────────────────────────────────────────────────────
 function startResultServer() {
@@ -130,6 +161,25 @@ function startResultServer() {
 async function main() {
   console.log('\n🟢 capacitor-llm Android E2E Test Suite\n')
 
+  // ─── Section 0: Project Setup ──────────────────────────────────────────
+  logSection('0 — Project Setup')
+
+  try {
+    ensureModel()
+    pass('0.1 Model available', `${Math.round(fs.statSync(MODEL_PATH).size / 1024 / 1024)} MB`)
+  } catch (err) {
+    fail('0.1 Model available', err.message?.slice(0, 200) || 'download failed')
+    process.exit(1)
+  }
+
+  try {
+    ensureCapSync()
+    pass('0.2 cap sync android')
+  } catch (err) {
+    fail('0.2 cap sync android', err.message?.slice(0, 200) || 'failed')
+    // continue — android dir already exists
+  }
+
   // ─── Section 1: Android Setup ─────────────────────────────────────────────
   logSection('1 — Android Setup')
 
@@ -180,14 +230,20 @@ async function main() {
     process.exit(1)
   }
 
-  // 1.4 Verify model file on device
+  // 1.4 Push model to device if not already there
   try {
-    const modelCheck = adb('shell ls -la /data/local/tmp/tinyllama-1.1b-chat-v1.0.Q2_K.gguf')
-    if (!modelCheck.includes('tinyllama')) throw new Error('Model not found on device')
-    pass('1.4 Model file on device', '/data/local/tmp/tinyllama-1.1b-chat-v1.0.Q2_K.gguf')
-  } catch (err) {
-    fail('1.4 Model file on device', 'Push model first: adb push tinyllama-1.1b-chat-v1.0.Q2_K.gguf /sdcard/Download/')
-    process.exit(1)
+    const modelCheck = adb(`shell ls -la ${DEVICE_MODEL_PATH} 2>/dev/null`)
+    if (!modelCheck.includes(MODEL_NAME)) throw new Error('not found')
+    pass('1.4 Model on device', DEVICE_MODEL_PATH)
+  } catch {
+    try {
+      console.log('  → Pushing model to device...')
+      adb(`push "${MODEL_PATH}" ${DEVICE_MODEL_PATH}`, { timeout: 300_000 })
+      pass('1.4 Model pushed to device', DEVICE_MODEL_PATH)
+    } catch (err) {
+      fail('1.4 Model on device', err.message?.slice(0, 200))
+      process.exit(1)
+    }
   }
 
   // ─── Section 2: HTTP E2E Test ──────────────────────────────────────────────
@@ -225,7 +281,6 @@ async function main() {
   const { summary } = appResults
   const appPassed = summary.passed || 0
   const appFailed = summary.failed || 0
-  const appTotal = summary.total || 0
 
   // Count app results as our results
   passedTests += appPassed

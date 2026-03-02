@@ -10,8 +10,9 @@
  *   - index.html POSTs __llm_result and __llm_done to http://127.0.0.1:8099
  *
  * Prerequisites:
- *   - Booted iOS Simulator
+ *   - Booted iOS Simulator (open Simulator.app first)
  *   - GGUF model at test/models/tinyllama-1.1b-chat-v1.0.Q2_K.gguf
+ *     (auto-downloaded on first run if missing)
  *
  * Usage:
  *   node test-e2e-ios.mjs
@@ -24,6 +25,7 @@ import fs from 'fs'
 import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const ROOT_DIR = path.resolve(__dirname, '..')
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const BUNDLE_ID   = 'io.t6x.llm.test'
@@ -31,6 +33,10 @@ const RUNNER_PORT = 8099
 const TOTAL_TESTS = 8
 const TIMEOUT_MS  = 300_000  // 5 min — model loading + inference is slow
 const MODEL_NAME  = 'tinyllama-1.1b-chat-v1.0.Q2_K.gguf'
+const MODEL_URL   = 'https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q2_K.gguf'
+const MODEL_DIR   = path.join(ROOT_DIR, 'test/models')
+const MODEL_PATH  = path.join(MODEL_DIR, MODEL_NAME)
+const IOS_MIN_VERSION = '16'
 
 // ─── Test runner state ────────────────────────────────────────────────────────
 let passedTests = 0, failedTests = 0
@@ -127,11 +133,84 @@ function startResultServer() {
   return serverReady
 }
 
+// ─── Shell helper ────────────────────────────────────────────────────────────
+function run(cmd, opts = {}) {
+  const nodePath = execSync('which node', { encoding: 'utf8' }).trim()
+  return execSync(cmd, {
+    encoding: 'utf8',
+    env: { ...process.env, PATH: `${path.dirname(nodePath)}:${process.env.PATH}` },
+    ...opts,
+  }).trim()
+}
+
+function npx(args, opts = {}) {
+  const npmPath = execSync('which npm', { encoding: 'utf8' }).trim()
+  const npxPath = path.join(path.dirname(npmPath), 'npx')
+  return run(`${npxPath} ${args}`, opts)
+}
+
+// ─── Project setup (idempotent) ──────────────────────────────────────────────
+function ensureModel() {
+  if (fs.existsSync(MODEL_PATH)) return
+  console.log(`  → Downloading model (${MODEL_NAME})...`)
+  fs.mkdirSync(MODEL_DIR, { recursive: true })
+  execSync(`curl -L -o "${MODEL_PATH}" "${MODEL_URL}"`, {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: 600_000,
+  })
+}
+
+function ensureIosPlatform() {
+  const iosDir = path.join(__dirname, 'ios')
+  if (fs.existsSync(iosDir)) return
+  console.log('  → cap add ios...')
+  npx('cap add ios', { cwd: __dirname, stdio: ['ignore', 'pipe', 'pipe'], timeout: 60_000 })
+}
+
+function fixDeploymentTarget() {
+  // Fix project.pbxproj
+  const pbxproj = path.join(__dirname, 'ios/App/App.xcodeproj/project.pbxproj')
+  if (fs.existsSync(pbxproj)) {
+    let content = fs.readFileSync(pbxproj, 'utf8')
+    const re = /IPHONEOS_DEPLOYMENT_TARGET = \d+\.\d+/g
+    if (content.match(re)?.[0]?.includes(`= ${IOS_MIN_VERSION}.0`)) return
+    content = content.replace(re, `IPHONEOS_DEPLOYMENT_TARGET = ${IOS_MIN_VERSION}.0`)
+    fs.writeFileSync(pbxproj, content)
+  }
+  // Fix CapApp-SPM Package.swift
+  const capSpm = path.join(__dirname, 'ios/App/CapApp-SPM/Package.swift')
+  if (fs.existsSync(capSpm)) {
+    let content = fs.readFileSync(capSpm, 'utf8')
+    content = content.replace(/\.iOS\(\.v\d+\)/, `.iOS(.v${IOS_MIN_VERSION})`)
+    fs.writeFileSync(capSpm, content)
+  }
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 //  MAIN
 // ═════════════════════════════════════════════════════════════════════════════
 async function main() {
   console.log('\n🔵 capacitor-llm iOS Simulator E2E Test Suite\n')
+
+  // ─── Section 0: Project Setup ──────────────────────────────────────────
+  logSection('0 — Project Setup')
+
+  try {
+    ensureModel()
+    pass('0.1 Model available', `${Math.round(fs.statSync(MODEL_PATH).size / 1024 / 1024)} MB`)
+  } catch (err) {
+    fail('0.1 Model available', err.message?.slice(0, 200) || 'download failed')
+    process.exit(1)
+  }
+
+  try {
+    ensureIosPlatform()
+    fixDeploymentTarget()
+    pass('0.2 iOS platform ready')
+  } catch (err) {
+    fail('0.2 iOS platform ready', err.message?.slice(0, 200) || 'cap add ios failed')
+    process.exit(1)
+  }
 
   // ─── Section 1: Simulator Setup ──────────────────────────────────────────
   logSection('1 — Simulator Setup')
@@ -148,21 +227,16 @@ async function main() {
     process.exit(1)
   }
 
-  // 1.2 First pass: cap sync + build + install to get app container path
-  //     We need the container path to know where to copy the model,
-  //     and we need the model path to inject into the HTML.
+  // 1.2 cap sync ios
   try {
     console.log('  → cap sync ios...')
-    const nodePath = execSync('which node', { encoding: 'utf8' }).trim()
-    const npmPath = execSync('which npm', { encoding: 'utf8' }).trim()
-    const npxPath = path.join(path.dirname(npmPath), 'npx')
-    execSync(`${npxPath} cap sync ios`, {
+    npx('cap sync ios', {
       cwd: __dirname,
-      encoding: 'utf8',
       timeout: 60000,
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, PATH: `${path.dirname(nodePath)}:${process.env.PATH}` }
     })
+    // Re-fix deployment target after cap sync (it may regenerate CapApp-SPM)
+    fixDeploymentTarget()
     pass('1.2 cap sync ios')
   } catch (err) {
     // Manually copy web assets as fallback
@@ -213,37 +287,37 @@ async function main() {
     process.exit(1)
   }
 
-  // 1.5 Get model path from the installed app bundle
-  //     The model is bundled as a resource in the .app, so the path is:
-  //     <bundle_dir>/tinyllama-1.1b-chat-v1.0.Q2_K.gguf
-  let modelPath
+  // 1.5 Copy model to the simulator app's data container
+  let modelSimPath
   try {
-    const bundleDir = simctl(`get_app_container ${udid} ${BUNDLE_ID}`)
-    modelPath = path.join(bundleDir, MODEL_NAME)
-    if (!fs.existsSync(modelPath)) {
-      throw new Error(`Model not found in app bundle at ${modelPath}`)
+    const dataDir = simctl(`get_app_container ${udid} ${BUNDLE_ID} data`)
+    const docsDir = path.join(dataDir, 'Documents')
+    fs.mkdirSync(docsDir, { recursive: true })
+    modelSimPath = path.join(docsDir, MODEL_NAME)
+    if (!fs.existsSync(modelSimPath)) {
+      console.log('  → Copying model to simulator...')
+      fs.copyFileSync(MODEL_PATH, modelSimPath)
     }
-    const sizeMB = Math.round(fs.statSync(modelPath).size / 1024 / 1024)
-    pass('1.5 Model bundled in app', `${sizeMB} MB`)
+    const sizeMB = Math.round(fs.statSync(modelSimPath).size / 1024 / 1024)
+    pass('1.5 Model in simulator', `${sizeMB} MB`)
   } catch (err) {
-    fail('1.5 Model bundled in app', err.message?.slice(0, 200) || 'failed')
+    fail('1.5 Model in simulator', err.message?.slice(0, 200) || 'failed')
     process.exit(1)
   }
 
-  // 1.6 Patch the installed app's HTML with the bundle model path
-  //     Modify index.html directly inside the installed .app bundle (no rebuild needed)
+  // 1.6 Patch the installed app's HTML with the model path
   try {
     const bundleDir = simctl(`get_app_container ${udid} ${BUNDLE_ID}`)
     const htmlInBundle = path.join(bundleDir, 'public/index.html')
     let html = fs.readFileSync(htmlInBundle, 'utf8')
     html = html.replace(
       /(?:const|let|var)\s+MODEL_PATH\s*=\s*'[^']*'/,
-      `const MODEL_PATH = '${modelPath}'`
+      `const MODEL_PATH = '${modelSimPath}'`
     )
     fs.writeFileSync(htmlInBundle, html)
-    pass('1.6 HTML patched in bundle', modelPath.split('/').slice(-1)[0])
+    pass('1.6 HTML patched', modelSimPath.split('/').slice(-3).join('/'))
   } catch (err) {
-    fail('1.6 HTML patched in bundle', err.message?.slice(0, 200) || 'failed')
+    fail('1.6 HTML patched', err.message?.slice(0, 200) || 'failed')
     process.exit(1)
   }
 

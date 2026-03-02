@@ -6,7 +6,9 @@
   "scripts": {
     "sync": "cap sync",
     "android": "cap run android",
-    "build:apk": "cd android && ./gradlew assembleDebug"
+    "build:apk": "cd android && ./gradlew assembleDebug",
+    "test:ios": "node test-e2e-ios.mjs",
+    "test:android": "node test-e2e-android.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.1.0",
