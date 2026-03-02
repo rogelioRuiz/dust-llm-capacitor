@@ -1,10 +1,10 @@
 [
   {
-    "pkg": "@dust/capacitor-core",
+    "pkg": "dust-core-capacitor",
     "classpath": "io.t6x.dust.capacitor.core.CorePlugin"
   },
   {
-    "pkg": "@dust/capacitor-llm",
+    "pkg": "dust-llm-capacitor",
     "classpath": "io.t6x.dust.capacitor.llm.LLMPlugin"
   }
 ]

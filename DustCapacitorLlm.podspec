@@ -8,7 +8,7 @@ Pod::Spec.new do |s|
   s.summary = package['description']
   s.license = package['license']
   s.homepage = 'https://github.com/rogelioRuiz/dust-llm-capacitor'
-  s.author = 'Techxagon'
+  s.author = 'Rogelio Ruiz Perez'
   s.source = { :git => 'https://github.com/rogelioRuiz/dust-llm-capacitor.git', :tag => s.version.to_s }
 
   s.source_files = 'ios/Sources/LLMPlugin/LLMPlugin.swift'

@@ -5,7 +5,7 @@
   "main": "dist/esm/index.js",
   "types": "dist/esm/index.d.ts",
   "type": "module",
-  "author": "Techxagon",
+  "author": "Rogelio Ruiz Perez",
   "repository": {
     "type": "git",
     "url": "https://github.com/rogelioRuiz/dust-llm-capacitor.git"
@@ -44,7 +44,7 @@
     "llm",
     "inference"
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "peerDependencies": {
     "@capacitor/core": "^7.0.0 || ^8.0.0",
     "dust-core-capacitor": ">=0.1.0"

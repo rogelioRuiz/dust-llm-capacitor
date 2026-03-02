@@ -11,8 +11,8 @@
   "dependencies": {
     "@capacitor/android": "^8.1.0",
     "@capacitor/core": "^8.1.0",
-    "@dust/capacitor-llm": "file:..",
-    "@dust/capacitor-core": "file:../../capacitor-core"
+    "dust-llm-capacitor": "file:..",
+    "dust-core-capacitor": "file:../../capacitor-core"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.1.0"

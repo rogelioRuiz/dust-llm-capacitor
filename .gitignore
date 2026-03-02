@@ -16,6 +16,7 @@ example/android/.cxx/
 example/android/app/build/
 examples/
 *.gguf
+!test/fixtures/*.gguf
 test/models/
 **/build/
 **/.gradle/
