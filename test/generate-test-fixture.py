@@ -12,7 +12,21 @@ import numpy as np
 def main() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     llama_cpp_root = repo_root.parent / "dust-llm-swift" / "native" / "llama.cpp"
-    sys.path.insert(0, str(llama_cpp_root / "gguf-py"))
+    gguf_py = llama_cpp_root / "gguf-py"
+
+    if not gguf_py.is_dir():
+        print(
+            "ERROR: Could not find gguf-py at:\n"
+            f"  {gguf_py}\n\n"
+            "This script requires the dust-llm-swift repo cloned as a sibling:\n"
+            "  git clone https://github.com/rogelioRuiz/dust-llm-swift.git "
+            f"{repo_root.parent / 'dust-llm-swift'}\n"
+            "  cd dust-llm-swift && git submodule update --init",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    sys.path.insert(0, str(gguf_py))
 
     sentencepiece_stub = types.ModuleType("sentencepiece")
 
@@ -73,8 +87,13 @@ def main() -> None:
     writer.write_tensors_to_file()
     writer.close()
 
-    swift_fixture_path.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(output_path, swift_fixture_path)
+    if swift_fixture_path.parent.exists():
+        shutil.copyfile(output_path, swift_fixture_path)
+        print(f"Copied fixture to {swift_fixture_path}")
+    else:
+        print(
+            f"Skipping Swift fixture copy (directory not found: {swift_fixture_path.parent})"
+        )
 
 
 if __name__ == "__main__":
