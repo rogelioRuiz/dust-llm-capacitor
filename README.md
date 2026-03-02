@@ -17,6 +17,7 @@
   <img alt="npm" src="https://img.shields.io/badge/npm-dust--llm--capacitor-cb3837">
   <img alt="Capacitor" src="https://img.shields.io/badge/Capacitor-7%20%7C%208-119EFF">
   <img alt="GGUF" src="https://img.shields.io/badge/GGUF-llama.cpp-blueviolet">
+  <a href="https://github.com/rogelioRuiz/dust-llm-capacitor/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/rogelioRuiz/dust-llm-capacitor/actions/workflows/ci.yml/badge.svg?branch=main"></a>
 </p>
 
 ---
