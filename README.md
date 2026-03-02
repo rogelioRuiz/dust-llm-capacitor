@@ -405,6 +405,161 @@ node test-e2e-android.mjs
 
 Set `TEST_MODE = false` in `example/www/index.html` to use the app as a regular chat interface with the on-device model.
 
+### Running manually (step by step)
+
+If you want full control instead of the one-command E2E scripts, follow these steps.
+
+#### 1. Clone and install
+
+```bash
+git clone https://github.com/rogelioRuiz/dust-llm-capacitor.git
+cd dust-llm-capacitor
+npm install && npm run build
+cd example && npm install
+```
+
+#### 2. Download a GGUF model
+
+The E2E scripts auto-download [Qwen 2.5 1.5B Instruct Q4_K_M](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF) (~1.1 GB). To download it yourself:
+
+```bash
+mkdir -p test/models
+curl -L --progress-bar -o test/models/qwen2.5-1.5b-instruct-q4_k_m.gguf \
+  https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf
+```
+
+#### 3a. iOS
+
+```bash
+# Add platform (skip if ios/ already exists)
+npx cap add ios
+npx cap sync ios
+
+# Build
+cd ios/App
+xcodebuild -scheme App -sdk iphonesimulator \
+  -destination 'platform=iOS Simulator,name=iPhone 16' \
+  -configuration Debug build
+cd ../..
+
+# Find the simulator UDID and install the app
+UDID=$(xcrun simctl list devices booted -j | python3 -c "
+import sys, json
+for devs in json.load(sys.stdin)['devices'].values():
+  for d in devs:
+    if d['state']=='Booted': print(d['udid']); break
+" 2>/dev/null | head -1)
+APP=$(find ~/Library/Developer/Xcode/DerivedData -name "App.app" \
+  -path "*Debug-iphonesimulator*" -not -path "*PlugIns*" | head -1)
+xcrun simctl install "$UDID" "$APP"
+
+# Copy the model into the app's Documents folder
+DATA_DIR=$(xcrun simctl get_app_container "$UDID" io.t6x.llmchat data)
+mkdir -p "$DATA_DIR/Documents"
+cp test/models/qwen2.5-1.5b-instruct-q4_k_m.gguf "$DATA_DIR/Documents/"
+
+# Patch MODEL_PATH in the installed app to point to the simulator path
+BUNDLE_DIR=$(xcrun simctl get_app_container "$UDID" io.t6x.llmchat)
+sed -i '' "s|var MODEL_PATH = '.*'|var MODEL_PATH = '$DATA_DIR/Documents/qwen2.5-1.5b-instruct-q4_k_m.gguf'|" \
+  "$BUNDLE_DIR/public/index.html"
+
+# Launch
+xcrun simctl launch "$UDID" io.t6x.llmchat
+```
+
+#### 3b. Android
+
+```bash
+# Add platform (skip if android/ already exists)
+npx cap add android
+npx cap sync android
+
+# Push model to device (MODEL_PATH in index.html defaults to /data/local/tmp/)
+adb push test/models/qwen2.5-1.5b-instruct-q4_k_m.gguf /data/local/tmp/
+
+# Build and install
+cd android && ./gradlew assembleDebug && cd ..
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+
+# Launch
+adb shell am start -n io.t6x.llmchat/.MainActivity
+```
+
+### Using a different GGUF model
+
+You can run any GGUF model — the example app is not tied to Qwen. Here's how to swap it.
+
+#### 1. Pick a model
+
+Browse [HuggingFace GGUF models](https://huggingface.co/models?library=gguf&sort=trending). For phones, stick to **1B–3B parameters** with **Q4_K_M** quantization — this gives the best balance of quality and speed on mobile RAM. Larger quants like Q5_K_M or Q8_0 are better quality but need more memory.
+
+| Parameters | Q4_K_M size | Recommended for |
+|-----------|------------|-----------------|
+| 0.5B–1.5B | 0.4–1.1 GB | Any phone |
+| 3B | ~2 GB | Phones with 6+ GB RAM |
+| 7B | ~4.5 GB | Tablets / phones with 8+ GB RAM, short bursts |
+
+#### 2. Update the example app
+
+Open `example/www/index.html` and change two things:
+
+```javascript
+// Line 745 — point to your model file
+var MODEL_PATH = '/data/local/tmp/your-model-name.gguf'
+
+// Line 1094-1100 — optionally update the descriptor ID
+function defaultDescriptor() {
+  return {
+    id: 'your-model',       // any string — used as the session key
+    format: 'gguf',
+    url: MODEL_PATH
+  }
+}
+```
+
+#### 3. Tune load config
+
+In the same file, the `loadModel()` call (line 1123) passes an `LLMConfig` object:
+
+```javascript
+var result = await state.LLM.loadModel({
+  descriptor: defaultDescriptor(),
+  config: {
+    contextSize: 512,    // raise for models that support larger contexts (e.g., 2048, 4096)
+    nGpuLayers: 0        // 0 = CPU-only (Android), -1 = auto Metal GPU (iOS)
+  }
+})
+```
+
+| Config key | Default | What it does |
+|-----------|---------|-------------|
+| `contextSize` | 512 | Token window size. Higher = more conversation memory, but more RAM. Start low and increase. |
+| `nGpuLayers` | 0 | Number of layers offloaded to GPU. Use `-1` on iOS for full Metal acceleration. Android is CPU-only (`0`). |
+| `batchSize` | (engine default) | Prompt processing batch size. Larger = faster prompt eval, more memory. |
+| `mmprojPath` | — | Path to a vision projector GGUF (required for multimodal models like LLaVA or Gemma 3n). |
+
+#### 4. Deploy the model file
+
+Follow the same steps as above — `adb push` for Android, `cp` into the simulator's Documents folder for iOS — using your new model filename.
+
+### Caveats
+
+**First iOS build takes ~10 minutes.** `dust-llm-swift` includes llama.cpp as a git submodule (~2 GB). SPM clones and compiles it from source on the first build. Subsequent builds use the SPM cache and are much faster.
+
+**Clean Derived Data if Xcode acts up.** Stale SPM caches can cause resolution failures after upgrading dependencies or switching branches. In Xcode: Product → Clean Build Folder. If that's not enough, delete `~/Library/Developer/Xcode/DerivedData` and rebuild.
+
+**Download GGUF files with `curl` or the browser, not `git clone`.** HuggingFace repos use Git LFS for large files. Cloning the repo often produces a tiny LFS pointer file instead of the actual model, which fails with a "not a GGUF file" error at load time.
+
+**Split GGUF files are not supported.** Some HuggingFace repos offer models split into parts (`model-00001-of-00003.gguf`, etc.). These require merging with `llama-gguf-split --merge` before use. Prefer single-file quants.
+
+**Model too large for device RAM → silent kill on iOS, crash on Android.** iOS terminates background apps without a crash log when memory pressure is critical. The plugin auto-evicts idle models under pressure, but if a single model exceeds available RAM it can't help. Rule of thumb: model file size + ~1 GB overhead should fit in the device's free memory.
+
+**`contextSize` multiplies memory usage.** A 4096-token context uses ~4× the RAM of a 1024-token context for the KV cache. If the app is killed shortly after loading, try lowering `contextSize` before switching to a smaller model.
+
+**Android GPU offload is not available.** `nGpuLayers` must be `0` on Android. Setting it to `-1` or any positive value will fail. GPU inference (Metal) is iOS-only.
+
+**`cap sync` may regenerate patched files.** If you manually patched the iOS deployment target or Android minSdk, running `cap sync` can overwrite your changes. Re-apply patches after syncing. The E2E test scripts handle this automatically, but manual runs require awareness.
+
 ## Native dependencies
 
 | Platform | Package | Source |
