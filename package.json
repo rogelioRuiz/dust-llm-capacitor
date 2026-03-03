@@ -18,6 +18,7 @@
     "lint:fix": "biome check --fix .",
     "typecheck": "tsc --noEmit",
     "test:ios": "npm run build && cd example && npm install && node test-e2e-ios.mjs --verbose",
+    "test:ios:sim": "npm run build && cd example && npm install && node test-e2e-ios.mjs --verbose --open-simulator",
     "test:ios:verbose": "npm run build && cd example && npm install && node test-e2e-ios.mjs --verbose",
     "test:android": "npm run build && cd example && npm install && node test-e2e-android.mjs --verbose",
     "test:android:verbose": "npm run build && cd example && npm install && node test-e2e-android.mjs --verbose",

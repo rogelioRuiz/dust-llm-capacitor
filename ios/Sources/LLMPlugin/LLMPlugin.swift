@@ -557,6 +557,12 @@ public class LLMPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private static func resolveModelPath(from descriptor: [String: Any]) -> String? {
         if let url = descriptor["url"] as? String, !url.isEmpty {
+            if url.hasPrefix("Documents/") {
+                if let docsUrl = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+                    let fileName = String(url.dropFirst("Documents/".count))
+                    return docsUrl.appendingPathComponent(fileName).path
+                }
+            }
             return url
         }
 
