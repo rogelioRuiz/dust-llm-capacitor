@@ -1755,7 +1755,7 @@
             // Clear history to avoid context overflow
             state.chatHistory = []
             var savedMax = state.defaultMaxTokens
-            state.defaultMaxTokens = 200
+            state.defaultMaxTokens = 2000
             simulateType('Write a very long detailed story about dragons and kingdoms')
 
             var stopClicked = false
