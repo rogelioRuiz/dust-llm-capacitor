@@ -10,10 +10,10 @@
  *
  * Prerequisites:
  *   - macOS with Xcode + at least one iPhone simulator installed
- *   - GGUF model auto-downloaded on first run
+ *   - Model auto-downloaded on first run (GGUF or MLX)
  *
  * Usage:
- *   node test-e2e-ios.mjs [--verbose]
+ *   node test-e2e-ios.mjs [--verbose] [--mlx]
  */
 
 import { execSync } from 'child_process'
@@ -25,17 +25,27 @@ import { fileURLToPath } from 'url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT_DIR = path.resolve(__dirname, '..')
 const VERBOSE = process.argv.includes('--verbose')
+const USE_MLX  = process.argv.includes('--mlx')
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const BUNDLE_ID    = 'io.t6x.llmchat'
 const RUNNER_PORT  = 8099
 const TOTAL_TESTS  = 14
 const TIMEOUT_MS   = 600_000  // 10 min — model loading + inference is slow
-const MODEL_NAME   = 'Qwen3.5-2B-Q4_K_M.gguf'
-const MODEL_URL    = 'https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf'
 const MODEL_DIR    = path.join(ROOT_DIR, 'test/models')
-const MODEL_PATH   = path.join(MODEL_DIR, MODEL_NAME)
-const IOS_MIN_VERSION = '16'
+
+// GGUF config
+const GGUF_MODEL_NAME = 'Qwen3.5-2B-Q4_K_M.gguf'
+const GGUF_MODEL_URL  = 'https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf'
+
+// MLX config
+const MLX_MODEL_NAME  = 'Qwen3.5-2B-8bit'
+const MLX_MODEL_REPO  = 'mlx-community/Qwen3.5-2B-8bit'
+
+const MODEL_NAME      = USE_MLX ? MLX_MODEL_NAME : GGUF_MODEL_NAME
+const MODEL_FORMAT    = USE_MLX ? 'mlx' : 'gguf'
+const MODEL_PATH      = path.join(MODEL_DIR, MODEL_NAME)
+const IOS_MIN_VERSION = USE_MLX ? '17' : '16'
 
 // ─── Test runner state ────────────────────────────────────────────────────────
 let passedTests = 0, failedTests = 0
@@ -185,12 +195,30 @@ function startResultServer() {
 // ─── Project setup (idempotent) ──────────────────────────────────────────────
 function ensureModel() {
   if (fs.existsSync(MODEL_PATH)) return
-  console.log(`  → Downloading model (${MODEL_NAME}, ~1.3 GB)...`)
   fs.mkdirSync(MODEL_DIR, { recursive: true })
-  execSync(`curl -L --progress-bar -o "${MODEL_PATH}" "${MODEL_URL}"`, {
-    stdio: ['ignore', process.stderr, 'pipe'],
-    timeout: 600_000,
-  })
+
+  if (USE_MLX) {
+    console.log(`  → Downloading MLX model (${MLX_MODEL_REPO}, ~4 GB)...`)
+    try {
+      execSync(`huggingface-cli download ${MLX_MODEL_REPO} --local-dir "${MODEL_PATH}"`, {
+        stdio: VERBOSE ? [0, 1, 2] : ['ignore', process.stderr, 'pipe'],
+        timeout: 1200_000,
+      })
+    } catch {
+      // Fallback: git clone with LFS
+      console.log('  → huggingface-cli not found, falling back to git clone...')
+      execSync(`git clone https://huggingface.co/${MLX_MODEL_REPO} "${MODEL_PATH}"`, {
+        stdio: VERBOSE ? [0, 1, 2] : ['ignore', process.stderr, 'pipe'],
+        timeout: 1200_000,
+      })
+    }
+  } else {
+    console.log(`  → Downloading model (${GGUF_MODEL_NAME}, ~1.3 GB)...`)
+    execSync(`curl -L --progress-bar -o "${MODEL_PATH}" "${GGUF_MODEL_URL}"`, {
+      stdio: ['ignore', process.stderr, 'pipe'],
+      timeout: 600_000,
+    })
+  }
 }
 
 function ensureIosPlatform() {
@@ -230,7 +258,10 @@ async function main() {
 
   try {
     ensureModel()
-    pass('0.1 Model available', `${Math.round(fs.statSync(MODEL_PATH).size / 1024 / 1024)} MB`)
+    const modelSizeMB = USE_MLX
+      ? Math.round(parseInt(execSync(`du -sm "${MODEL_PATH}" | cut -f1`, { encoding: 'utf8' }).trim(), 10))
+      : Math.round(fs.statSync(MODEL_PATH).size / 1024 / 1024)
+    pass('0.1 Model available', `${modelSizeMB} MB (${MODEL_FORMAT})`)
   } catch (err) {
     fail('0.1 Model available', err.message?.slice(0, 200) || 'download failed')
     process.exit(1)
@@ -335,11 +366,17 @@ async function main() {
     fs.mkdirSync(docsDir, { recursive: true })
     modelSimPath = path.join(docsDir, MODEL_NAME)
     if (!fs.existsSync(modelSimPath)) {
-      console.log('  → Copying model to simulator...')
-      fs.copyFileSync(MODEL_PATH, modelSimPath)
+      console.log(`  → Copying model to simulator (${MODEL_FORMAT})...`)
+      if (USE_MLX) {
+        execSync(`cp -R "${MODEL_PATH}" "${modelSimPath}"`, { timeout: 120_000 })
+      } else {
+        fs.copyFileSync(MODEL_PATH, modelSimPath)
+      }
     }
-    const sizeMB = Math.round(fs.statSync(modelSimPath).size / 1024 / 1024)
-    pass('1.5 Model in simulator', `${sizeMB} MB`)
+    const sizeMB = USE_MLX
+      ? Math.round(parseInt(execSync(`du -sm "${modelSimPath}" | cut -f1`, { encoding: 'utf8' }).trim(), 10))
+      : Math.round(fs.statSync(modelSimPath).size / 1024 / 1024)
+    pass('1.5 Model in simulator', `${sizeMB} MB (${MODEL_FORMAT})`)
   } catch (err) {
     fail('1.5 Model in simulator', err.message?.slice(0, 200) || 'failed')
     process.exit(1)
@@ -353,8 +390,9 @@ async function main() {
     html = html
       .replace(/var TEST_MODE = (true|false)/, 'var TEST_MODE = true')
       .replace(/var MODEL_PATH = '[^']*'/, `var MODEL_PATH = '${modelSimPath}'`)
+      .replace(/var MODEL_FORMAT = '[^']*'/, `var MODEL_FORMAT = '${MODEL_FORMAT}'`)
     fs.writeFileSync(htmlInBundle, html)
-    pass('1.6 HTML patched', modelSimPath.split('/').slice(-3).join('/'))
+    pass('1.6 HTML patched', `${MODEL_FORMAT} → ${modelSimPath.split('/').slice(-3).join('/')}`)
   } catch (err) {
     fail('1.6 HTML patched', err.message?.slice(0, 200) || 'failed')
     process.exit(1)

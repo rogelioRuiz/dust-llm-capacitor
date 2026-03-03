@@ -743,6 +743,7 @@
   <script>
     var TEST_MODE = false
     var MODEL_PATH = '/data/local/tmp/Qwen3.5-2B-Q4_K_M.gguf'
+    var MODEL_FORMAT = 'gguf'
     var RUNNER_URL = 'http://127.0.0.1:8099'
 
     ;(function () {
@@ -1092,9 +1093,10 @@
       }
 
       function defaultDescriptor() {
+        var format = MODEL_FORMAT || (MODEL_PATH.endsWith('.gguf') ? 'gguf' : 'mlx')
         return {
           id: 'qwen3.5',
-          format: 'gguf',
+          format: format,
           url: MODEL_PATH
         }
       }
@@ -1122,7 +1124,7 @@
         try {
           var result = await state.LLM.loadModel({
             descriptor: defaultDescriptor(),
-            config: { contextSize: 512, nGpuLayers: 0 }
+            config: { contextSize: 512, nGpuLayers: -1 }
           })
 
           state.modelId = result.modelId

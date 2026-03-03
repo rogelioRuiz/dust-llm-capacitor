@@ -46,8 +46,9 @@ public class LLMPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
-        guard format == DustModelFormat.gguf.rawValue else {
-            call.reject("Only gguf models are supported", "formatUnsupported", nil)
+        let supportedFormats: Set<String> = [DustModelFormat.gguf.rawValue, DustModelFormat.mlx.rawValue]
+        guard supportedFormats.contains(format) else {
+            call.reject("Only gguf and mlx models are supported", "formatUnsupported", nil)
             return
         }
 
