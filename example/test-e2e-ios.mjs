@@ -45,7 +45,7 @@ const MLX_MODEL_REPO  = 'mlx-community/Qwen3.5-2B-8bit'
 const MODEL_NAME      = USE_MLX ? MLX_MODEL_NAME : GGUF_MODEL_NAME
 const MODEL_FORMAT    = USE_MLX ? 'mlx' : 'gguf'
 const MODEL_PATH      = path.join(MODEL_DIR, MODEL_NAME)
-const IOS_MIN_VERSION = USE_MLX ? '17' : '16'
+const IOS_MIN_VERSION = '17'
 
 // ─── Test runner state ────────────────────────────────────────────────────────
 let passedTests = 0, failedTests = 0

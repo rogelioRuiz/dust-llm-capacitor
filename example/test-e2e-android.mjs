@@ -165,11 +165,11 @@ function patchAndroidBuildGradle() {
 }
 
 function patchMinSdkVersion() {
-  // dust-llm-capacitor requires minSdk 26, Capacitor defaults to 24
+  // dust-llm-capacitor requires minSdk 28, Capacitor defaults to 24
   const varsGradle = path.join(__dirname, 'android/variables.gradle')
   if (!fs.existsSync(varsGradle)) return
   let content = fs.readFileSync(varsGradle, 'utf8')
-  content = content.replace(/minSdkVersion = \d+/, 'minSdkVersion = 26')
+  content = content.replace(/minSdkVersion = \d+/, 'minSdkVersion = 28')
   fs.writeFileSync(varsGradle, content)
 }
 
