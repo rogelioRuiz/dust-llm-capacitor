@@ -330,6 +330,7 @@ async function main() {
       cwd: path.join(__dirname, 'ios/App'),
       encoding: 'utf8',
       timeout: 600_000,
+      maxBuffer: 200 * 1024 * 1024,  // 200 MB — xcodebuild verbose output is large
       stdio: VERBOSE ? [0, 1, 2] : ['ignore', 'pipe', 'pipe'],
     }
     // On a cold SPM checkout dust-llm-swift's llama.cpp submodule may not be

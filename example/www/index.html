@@ -1789,6 +1789,8 @@
               await waitFor(function () { return !state.isGenerating }, 5000, 'generation stopped')
             } catch (_e) {
               state.isGenerating = false
+              // Give any in-flight inferenceComplete event time to arrive and apply badge
+              await sleep(1000)
             }
 
             state.defaultMaxTokens = savedMax
