@@ -1779,13 +1779,18 @@
 
             // If stop was clicked but generation hasn't stopped, retry cancel via API
             if (state.isGenerating && state.modelId) {
-              try { await state.LLM.cancelGeneration({ modelId: state.modelId }) } catch (_e) {}
+              try {
+                await state.LLM.cancelGeneration({ modelId: state.modelId })
+                // Safety: force flag reset in case inferenceComplete/inferenceFailed
+                // events don't fire after cancellation (Android emulator race condition)
+                state.isGenerating = false
+              } catch (_e) {}
             }
 
             // Wait for generation to fully stop
             await waitFor(function () {
               return !state.isGenerating
-            }, 120000, 'generation stopped')
+            }, 30000, 'generation stopped')
 
             state.defaultMaxTokens = savedMax
 

@@ -243,6 +243,17 @@ function fixDeploymentTarget() {
   if (fs.existsSync(capSpm)) {
     let content = fs.readFileSync(capSpm, 'utf8')
     content = content.replace(/\.iOS\(\.v\d+\)/, `.iOS(.v${IOS_MIN_VERSION})`)
+    // Remove local dust-core-capacitor path dep — it conflicts with the GitHub URL dep
+    // declared in DustLlmCapacitor/Package.swift (same identity, two sources → SwiftPM error).
+    // DustCoreCapacitor is satisfied transitively through the DustLlmCapacitor local package.
+    content = content.replace(
+      /\s*\.package\(name:\s*"DustCoreCapacitor",\s*path:[^)]+\),?\n?/,
+      '\n'
+    )
+    content = content.replace(
+      /\s*\.product\(name:\s*"DustCoreCapacitor",\s*package:\s*"DustCoreCapacitor"\),?\n?/,
+      '\n'
+    )
     fs.writeFileSync(capSpm, content)
   }
 }
