@@ -333,15 +333,20 @@ async function main() {
       maxBuffer: 200 * 1024 * 1024,  // 200 MB — xcodebuild verbose output is large
       stdio: VERBOSE ? [0, 1, 2] : ['ignore', 'pipe', 'pipe'],
     }
-    // On a cold SPM checkout dust-llm-swift's llama.cpp submodule may not be
-    // fully initialized, causing the first build to fail. A single retry is
-    // enough — SPM finishes resolving on the second pass.
+    // Resolve SPM packages first — this ensures dust-llm-swift's llama.cpp
+    // submodule (and any other remote dependencies) are fully fetched before
+    // the compile step. Without this, a cold SPM checkout produces
+    // "missing target PACKAGE-TARGET:llama" on the first build.
+    console.log('  → Resolving SPM dependencies…')
+    const resolveCmd =
+      `xcodebuild -scheme App -sdk iphonesimulator ` +
+      `-destination "platform=iOS Simulator,id=${udid}" -resolvePackageDependencies`
     try {
-      execSync(buildCmd, buildOpts)
-    } catch (_firstErr) {
-      console.log('  → First build attempt failed (likely SPM submodule init), retrying…')
-      execSync(buildCmd, buildOpts)
+      execSync(resolveCmd, buildOpts)
+    } catch (_resolveErr) {
+      // Non-fatal: resolve may fail if already cached; build will surface real errors
     }
+    execSync(buildCmd, buildOpts)
     pass('1.3 xcodebuild succeeded')
   } catch (err) {
     const output = (err.stdout || err.stderr || err.message || '')
