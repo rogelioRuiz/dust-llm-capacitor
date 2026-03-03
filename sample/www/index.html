@@ -1,0 +1,1701 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+  />
+  <title>LLM Sample</title>
+  <style>
+    :root {
+      --background: oklch(0.145 0 0);
+      --foreground: oklch(0.935 0 0);
+      --card: oklch(0.205 0 0);
+      --card-foreground: oklch(0.935 0 0);
+      --popover: oklch(0.25 0 0);
+      --popover-foreground: oklch(0.935 0 0);
+      --primary: oklch(0.541 0.245 293);
+      --primary-foreground: oklch(0.985 0 0);
+      --secondary: oklch(0.269 0 0);
+      --secondary-foreground: oklch(0.935 0 0);
+      --muted: oklch(0.269 0 0);
+      --muted-foreground: oklch(0.708 0 0);
+      --accent: oklch(0.269 0 0);
+      --accent-foreground: oklch(0.935 0 0);
+      --destructive: oklch(0.577 0.245 27.325);
+      --destructive-foreground: oklch(0.985 0 0);
+      --border: oklch(1 0 0 / 12%);
+      --input: oklch(1 0 0 / 12%);
+      --ring: oklch(0.541 0.245 293);
+      --success: oklch(0.696 0.17 162.48);
+      --success-foreground: oklch(0.145 0 0);
+      --warning: oklch(0.75 0.183 55);
+      --warning-foreground: oklch(0.145 0 0);
+      --info: oklch(0.623 0.214 259);
+      --info-foreground: oklch(0.985 0 0);
+      --radius: 18px;
+      --shadow-soft: 0 22px 60px rgba(0, 0, 0, 0.32);
+    }
+
+    @supports not (color: oklch(0.145 0 0)) {
+      :root {
+        --background: #0d0d0d;
+        --foreground: #f0f0f0;
+        --card: #171717;
+        --card-foreground: #f0f0f0;
+        --popover: #202020;
+        --popover-foreground: #f0f0f0;
+        --primary: #7c3aed;
+        --primary-foreground: #fafafa;
+        --secondary: #2b2b2b;
+        --secondary-foreground: #f0f0f0;
+        --muted: #2b2b2b;
+        --muted-foreground: #a7a7a7;
+        --accent: #2b2b2b;
+        --accent-foreground: #f0f0f0;
+        --destructive: #dc2626;
+        --destructive-foreground: #fafafa;
+        --border: rgba(255, 255, 255, 0.12);
+        --input: rgba(255, 255, 255, 0.12);
+        --ring: #7c3aed;
+        --success: #22c55e;
+        --success-foreground: #0d0d0d;
+        --warning: #f59e0b;
+        --warning-foreground: #0d0d0d;
+        --info: #3b82f6;
+        --info-foreground: #fafafa;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+    }
+
+    body {
+      background:
+        radial-gradient(circle at 18% 14%, rgba(124, 58, 237, 0.14), transparent 34%),
+        radial-gradient(circle at 78% 0%, rgba(124, 58, 237, 0.08), transparent 28%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 22%),
+        var(--background);
+      color: var(--foreground);
+      font-family:
+        -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    }
+
+    button,
+    textarea {
+      font: inherit;
+      color: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .panel {
+      width: 100%;
+      max-width: 980px;
+      margin: 0 auto;
+    }
+
+    /* ─── Download Screen ──────────────────────────────────────────────────── */
+
+    #download-screen {
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding:
+        calc(env(safe-area-inset-top, 0px) + 40px)
+        24px
+        calc(env(safe-area-inset-bottom, 0px) + 40px);
+      transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+
+    .download-card {
+      width: min(420px, 100%);
+      padding: 32px 28px;
+      border-radius: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03)),
+        rgba(16, 16, 16, 0.9);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(20px);
+      text-align: center;
+    }
+
+    .download-icon {
+      width: 72px;
+      height: 72px;
+      margin: 0 auto 20px;
+      border-radius: 22px;
+      background: linear-gradient(135deg, rgba(124, 58, 237, 0.28), rgba(124, 58, 237, 0.1));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .download-icon svg {
+      width: 32px;
+      height: 32px;
+      stroke: var(--primary);
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .download-card .eyebrow {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--primary);
+    }
+
+    .download-card h1 {
+      margin: 10px 0 10px;
+      font-size: 1.5rem;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+    }
+
+    .download-card p {
+      margin: 0 0 18px;
+      line-height: 1.5;
+      color: var(--muted-foreground);
+      font-size: 0.92rem;
+    }
+
+    .model-info {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .model-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 0 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--muted-foreground);
+      font-size: 0.74rem;
+      font-weight: 600;
+    }
+
+    .progress-container {
+      margin-bottom: 18px;
+    }
+
+    .progress-bar {
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--primary), rgba(139, 92, 246, 0.9));
+      transition: width 0.3s ease;
+    }
+
+    .progress-text {
+      margin-top: 8px;
+      font-size: 0.8rem;
+      color: var(--muted-foreground);
+    }
+
+    .download-status {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 14px;
+      font-size: 0.82rem;
+      color: var(--muted-foreground);
+    }
+
+    .download-btn {
+      width: 100%;
+      height: 52px;
+      border: 0;
+      border-radius: 999px;
+      padding: 0 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background:
+        linear-gradient(135deg, rgba(124, 58, 237, 1), rgba(139, 92, 246, 0.82));
+      color: var(--primary-foreground);
+      font-weight: 700;
+      font-size: 0.98rem;
+      letter-spacing: 0.01em;
+      box-shadow: 0 18px 36px rgba(124, 58, 237, 0.22);
+      transition: opacity 0.15s ease, transform 0.12s ease;
+    }
+
+    .download-btn:active {
+      transform: scale(0.97);
+    }
+
+    .download-btn:disabled {
+      opacity: 0.65;
+      cursor: default;
+      transform: none;
+    }
+
+    /* ─── Chat Screen ──────────────────────────────────────────────────────── */
+
+    #chat-ui {
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+
+    #header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      padding:
+        calc(env(safe-area-inset-top, 0px) + 18px)
+        18px
+        16px;
+      border-bottom: 1px solid var(--border);
+      background:
+        linear-gradient(
+          180deg,
+          rgba(13, 13, 13, 0.92) 0%,
+          rgba(13, 13, 13, 0.86) 70%,
+          rgba(13, 13, 13, 0.68) 100%
+        );
+      backdrop-filter: blur(24px);
+    }
+
+    #header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    #title {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+    #model-label {
+      margin-top: 4px;
+      font-size: 0.8rem;
+      color: var(--muted-foreground);
+      word-break: break-word;
+    }
+
+    #status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.04);
+      font-size: 0.78rem;
+      color: var(--muted-foreground);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--warning);
+      box-shadow: 0 0 14px rgba(245, 158, 11, 0.4);
+      flex-shrink: 0;
+    }
+
+    .status-dot.loading {
+      animation: pulse 1.3s ease-in-out infinite;
+    }
+
+    .status-dot.ready {
+      background: var(--success);
+      box-shadow: 0 0 14px rgba(34, 197, 94, 0.35);
+      animation: none;
+    }
+
+    .status-dot.generating {
+      background: var(--primary);
+      box-shadow: 0 0 16px rgba(124, 58, 237, 0.45);
+      animation: pulse 0.9s ease-in-out infinite;
+    }
+
+    .status-dot.error {
+      background: var(--destructive);
+      box-shadow: 0 0 14px rgba(220, 38, 38, 0.45);
+      animation: none;
+    }
+
+    #messages-shell {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+    }
+
+    #messages-shell::before,
+    #messages-shell::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 80px;
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    #messages-shell::before {
+      top: 0;
+      background: linear-gradient(180deg, var(--background) 0%, transparent 100%);
+    }
+
+    #messages-shell::after {
+      bottom: 0;
+      background: linear-gradient(0deg, var(--background) 0%, transparent 100%);
+    }
+
+    #messages {
+      height: 100%;
+      overflow-y: auto;
+      padding: 18px;
+      padding-top: 28px;
+      padding-bottom: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      scroll-behavior: smooth;
+    }
+
+    .message-row {
+      display: flex;
+      width: 100%;
+    }
+
+    .message-row.user {
+      justify-content: flex-end;
+    }
+
+    .message-row.assistant,
+    .message-row.error {
+      justify-content: flex-start;
+    }
+
+    .message-bubble {
+      width: auto;
+      max-width: min(80%, 720px);
+      padding: 12px 16px;
+      border-radius: 0.5rem;
+      border: none;
+      background: var(--secondary);
+    }
+
+    .message-row.user .message-bubble {
+      background: var(--secondary);
+      color: var(--foreground);
+    }
+
+    .message-row.assistant .message-bubble {
+      width: 100%;
+      max-width: 100%;
+      background: transparent;
+      padding: 4px 2px;
+    }
+
+    .message-row.error .message-bubble {
+      width: 100%;
+      max-width: 100%;
+      background: rgba(220, 38, 38, 0.08);
+      border: 1px solid rgba(220, 38, 38, 0.18);
+      border-radius: 0.5rem;
+    }
+
+    .message-role {
+      display: none;
+    }
+
+    .message-row {
+      animation: msg-in 0.28s ease-out both;
+    }
+
+    @keyframes msg-in {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .message-body {
+      font-size: 0.98rem;
+      line-height: 1.6;
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+
+    .streaming-cursor {
+      display: inline-block;
+      margin-left: 3px;
+      color: var(--primary);
+      animation: blink 0.95s steps(1) infinite;
+    }
+
+    .message-meta {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .message-meta:empty {
+      display: none;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 0 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--muted-foreground);
+      font-size: 0.76rem;
+      font-weight: 600;
+    }
+
+    .badge.success {
+      background: rgba(34, 197, 94, 0.12);
+      border-color: rgba(34, 197, 94, 0.18);
+      color: rgba(134, 239, 172, 0.95);
+    }
+
+    .badge.info {
+      background: rgba(59, 130, 246, 0.12);
+      border-color: rgba(59, 130, 246, 0.18);
+      color: rgba(147, 197, 253, 0.95);
+    }
+
+    .badge.warning {
+      background: rgba(245, 158, 11, 0.12);
+      border-color: rgba(245, 158, 11, 0.18);
+      color: rgba(253, 224, 71, 0.95);
+    }
+
+    .badge.error {
+      background: rgba(220, 38, 38, 0.12);
+      border-color: rgba(220, 38, 38, 0.18);
+      color: rgba(252, 165, 165, 0.95);
+    }
+
+    #input-bar {
+      padding:
+        10px
+        16px
+        calc(env(safe-area-inset-bottom, 0px) + 12px);
+    }
+
+    #composer {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      padding: 10px;
+      border-radius: 1rem;
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      background: rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+    }
+
+    #prompt-input {
+      width: 100%;
+      min-height: 46px;
+      max-height: 160px;
+      resize: none;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      padding: 10px 12px;
+      color: inherit;
+    }
+
+    #prompt-input::placeholder {
+      color: var(--muted-foreground);
+    }
+
+    #prompt-input:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    #primary-action {
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      border: 0;
+      border-radius: 0.5rem;
+      background: var(--primary);
+      color: var(--primary-foreground);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.15s ease, opacity 0.15s ease, transform 0.1s ease;
+    }
+
+    #primary-action:active {
+      transform: scale(0.93);
+    }
+
+    #primary-action.stop {
+      background: var(--destructive);
+      color: var(--destructive-foreground);
+    }
+
+    #primary-action:disabled {
+      opacity: 0.35;
+      cursor: default;
+      transform: none;
+    }
+
+    #primary-action svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    #primary-action.stop svg {
+      fill: currentColor;
+      stroke: none;
+    }
+
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.25);
+      border-top-color: currentColor;
+      animation: spin 0.8s linear infinite;
+    }
+
+    /* Test UI styles removed — tests interact over chat */
+
+    /* ─── Keyframes ────────────────────────────────────────────────────────── */
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @keyframes blink {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 0.8; }
+      50% { transform: scale(1.22); opacity: 1; }
+    }
+
+    /* ─── Responsive ───────────────────────────────────────────────────────── */
+
+    @media (max-width: 640px) {
+      #header,
+      #messages,
+      #input-bar,
+      #test-ui {
+        padding-left: 14px;
+        padding-right: 14px;
+      }
+
+      #header-row {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      #status-pill { align-self: flex-start; }
+
+      .message-bubble { max-width: 88%; }
+
+      .message-row.assistant .message-bubble,
+      .message-row.error .message-bubble { max-width: 100%; }
+
+      #primary-action { min-width: 72px; padding: 0 14px; }
+
+      .download-card { padding: 24px 20px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- ─── Screen 1: Download Model ────────────────────────────────────────── -->
+  <div id="download-screen" class="panel">
+    <div class="download-card">
+      <div class="download-icon">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </div>
+      <div class="eyebrow">dust-llm-capacitor</div>
+      <h1>Download Qwen 3.5</h1>
+      <p id="download-subtitle">Download a 2B-parameter model to run inference directly on this device.</p>
+
+      <div class="model-info">
+        <span class="model-badge">GGUF</span>
+        <span class="model-badge">Q4_K_M</span>
+        <span class="model-badge">~1.3 GB</span>
+      </div>
+
+      <div id="progress-container" class="progress-container hidden">
+        <div class="progress-bar">
+          <div id="progress-fill" class="progress-fill"></div>
+        </div>
+        <div id="progress-text" class="progress-text">0%</div>
+      </div>
+
+      <div id="download-status" class="download-status hidden">
+        <span id="download-status-dot" class="status-dot"></span>
+        <span id="download-status-label"></span>
+      </div>
+
+      <button id="download-btn" class="download-btn" type="button" disabled>
+        <span id="download-spinner" class="spinner hidden"></span>
+        <span id="download-btn-label">Waiting for bridge...</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ─── Screen 2: Chat ──────────────────────────────────────────────────── -->
+  <div id="chat-ui" class="panel hidden">
+    <header id="header">
+      <div id="header-row">
+        <div>
+          <div id="title">LLM Sample</div>
+          <div id="model-label">No model loaded</div>
+        </div>
+        <div id="status-pill">
+          <span id="status-dot" class="status-dot loading"></span>
+          <span id="status-label">Waiting</span>
+        </div>
+      </div>
+    </header>
+
+    <main id="messages-shell">
+      <div id="messages">
+        <div id="welcome-state" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;opacity:0.5;padding:40px 20px;text-align:center;">
+          <div style="font-size:2rem;margin-bottom:4px;">&#x2728;</div>
+          <div style="font-size:0.92rem;color:var(--muted-foreground);">Model ready. Ask anything.</div>
+        </div>
+      </div>
+    </main>
+
+    <footer id="input-bar">
+      <div id="composer">
+        <textarea
+          id="prompt-input"
+          rows="1"
+          placeholder="Ask something..."
+          disabled
+        ></textarea>
+        <button id="primary-action" type="button" disabled>
+          <svg viewBox="0 0 24 24"><polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg>
+        </button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Test UI removed — e2e tests interact over the chat directly -->
+
+  <script src="capacitor.js"></script>
+  <script>
+    /* ─── Patchable config (overwritten by e2e scripts) ─────────────────── */
+    var TEST_MODE = false
+    var MODEL_PATH = ''
+    var MODEL_FORMAT = 'gguf'
+    var RUNNER_URL = 'http://127.0.0.1:8099'
+    var SKIP_DOWNLOAD = false
+    var GGUF_URL = 'https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf'
+    var GGUF_NAME = 'Qwen3.5-2B-Q4_K_M.gguf'
+
+    ;(function () {
+      /* ─── State ─────────────────────────────────────────────────────────── */
+      var state = {
+        LLM: null,
+        Filesystem: null,
+        // FileTransfer removed — using Filesystem.downloadFile() instead
+        bridgeReady: false,
+        listenersAttached: false,
+        // download
+        downloading: false,
+        downloadProgress: 0,
+        downloadedBytes: 0,
+        totalBytes: 0,
+        // model
+        modelLoading: false,
+        modelId: null,
+        metadata: null,
+        // chat
+        isGenerating: false,
+        chatHistory: [],
+        activeAssistant: null,
+        pendingGeneration: null,
+        lastCompletion: null,
+        defaultMaxTokens: 128
+      }
+
+      var els = {}
+
+      /* ─── Helpers ───────────────────────────────────────────────────────── */
+
+      function byId(id) { return document.getElementById(id) }
+      function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms) }) }
+
+      function createDeferred() {
+        var d = {}
+        d.promise = new Promise(function (resolve, reject) { d.resolve = resolve; d.reject = reject })
+        return d
+      }
+
+      function formatBytes(bytes) {
+        if (bytes < 1024) return bytes + ' B'
+        if (bytes < 1048576) return (bytes / 1024).toFixed(0) + ' KB'
+        if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB'
+        return (bytes / 1073741824).toFixed(2) + ' GB'
+      }
+
+      /* ─── Element cache ─────────────────────────────────────────────────── */
+
+      function cacheEls() {
+        // download
+        els.downloadScreen = byId('download-screen')
+        els.downloadBtn = byId('download-btn')
+        els.downloadSpinner = byId('download-spinner')
+        els.downloadBtnLabel = byId('download-btn-label')
+        els.progressContainer = byId('progress-container')
+        els.progressFill = byId('progress-fill')
+        els.progressText = byId('progress-text')
+        els.downloadStatus = byId('download-status')
+        els.downloadStatusDot = byId('download-status-dot')
+        els.downloadStatusLabel = byId('download-status-label')
+        // chat
+        els.chatUi = byId('chat-ui')
+        els.statusDot = byId('status-dot')
+        els.statusLabel = byId('status-label')
+        els.modelLabel = byId('model-label')
+        els.messages = byId('messages')
+        els.promptInput = byId('prompt-input')
+        els.primaryAction = byId('primary-action')
+        // test (virtual — no UI panel, results reported via HTTP)
+        els.testUi = null
+        els.testStatus = null
+        els.tests = null
+        els.summary = null
+        els.plugins = null
+      }
+
+      /* ─── Download UI ───────────────────────────────────────────────────── */
+
+      function setDownloadBtnState(loading, label) {
+        state.downloading = !!loading
+        els.downloadBtn.disabled = !!loading
+        els.downloadSpinner.classList.toggle('hidden', !loading)
+        els.downloadBtnLabel.textContent = label
+      }
+
+      function setDownloadStatus(kind, label) {
+        els.downloadStatus.classList.remove('hidden')
+        els.downloadStatusDot.className = 'status-dot ' + kind
+        els.downloadStatusLabel.textContent = label
+      }
+
+      function updateProgressUI() {
+        els.progressContainer.classList.remove('hidden')
+        els.progressFill.style.width = state.downloadProgress + '%'
+        var text = state.downloadProgress + '%'
+        if (state.downloadedBytes > 0 && state.totalBytes > 0) {
+          text += ' \u2014 ' + formatBytes(state.downloadedBytes) + ' / ' + formatBytes(state.totalBytes)
+        }
+        els.progressText.textContent = text
+      }
+
+      function setDownloadError(message) {
+        setDownloadBtnState(false, 'Retry Download')
+        els.downloadBtn.disabled = false
+        setDownloadStatus('error', message)
+      }
+
+      /* ─── Chat UI (reused from example) ─────────────────────────────────── */
+
+      function setStatus(kind, label) {
+        if (els.statusDot) els.statusDot.className = 'status-dot ' + kind
+        if (els.statusLabel) els.statusLabel.textContent = label
+        if (els.testStatus) els.testStatus.textContent = label
+      }
+
+      function setModelLabel(message) {
+        if (els.modelLabel) els.modelLabel.textContent = message
+      }
+
+      function setComposerEnabled(enabled) {
+        els.promptInput.disabled = !enabled
+        updatePrimaryAction()
+      }
+
+      function autoResizeTextarea() {
+        els.promptInput.style.height = 'auto'
+        var nextHeight = Math.min(els.promptInput.scrollHeight, 160)
+        els.promptInput.style.height = nextHeight + 'px'
+      }
+
+      function scrollMessages() {
+        requestAnimationFrame(function () {
+          els.messages.scrollTop = els.messages.scrollHeight
+        })
+      }
+
+      var SEND_ICON = '<svg viewBox="0 0 24 24"><polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg>'
+      var STOP_ICON = '<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>'
+
+      function updatePrimaryAction() {
+        var hasPrompt = els.promptInput.value.trim().length > 0
+        if (state.isGenerating) {
+          els.primaryAction.innerHTML = STOP_ICON
+          els.primaryAction.classList.add('stop')
+          els.primaryAction.disabled = !state.modelId
+          return
+        }
+        els.primaryAction.innerHTML = SEND_ICON
+        els.primaryAction.classList.remove('stop')
+        els.primaryAction.disabled = !state.modelId || state.modelLoading || !hasPrompt
+      }
+
+      function clearMessageMeta(message) {
+        while (message.meta.firstChild) message.meta.removeChild(message.meta.firstChild)
+      }
+
+      function addMetaBadge(message, text, tone) {
+        var badge = document.createElement('span')
+        badge.className = 'badge' + (tone ? ' ' + tone : '')
+        badge.textContent = text
+        message.meta.appendChild(badge)
+      }
+
+      function applyCompletionMeta(message, event) {
+        clearMessageMeta(message)
+        if (typeof event.tokensPerSecond === 'number') {
+          addMetaBadge(message, 'TPS ' + event.tokensPerSecond.toFixed(1), 'success')
+        }
+        if (typeof event.completionTokens === 'number') {
+          addMetaBadge(message, event.completionTokens + ' tokens', 'info')
+        }
+        if (event.stopReason) {
+          addMetaBadge(message, event.stopReason.replace('_', ' '), 'warning')
+        }
+      }
+
+      function applyErrorMeta(message, errorText) {
+        clearMessageMeta(message)
+        addMetaBadge(message, errorText, 'error')
+      }
+
+      function addMessage(role, text) {
+        // Remove welcome state on first message
+        var welcome = document.getElementById('welcome-state')
+        if (welcome) welcome.remove()
+
+        var row = document.createElement('div')
+        row.className = 'message-row ' + role
+
+        var bubble = document.createElement('div')
+        bubble.className = 'message-bubble'
+
+        var body = document.createElement('div')
+        body.className = 'message-body'
+
+        var textSpan = document.createElement('span')
+        textSpan.className = 'message-text'
+        textSpan.textContent = text || ''
+
+        var cursor = document.createElement('span')
+        cursor.className = 'streaming-cursor hidden'
+        cursor.textContent = '\u25AE'
+
+        body.appendChild(textSpan)
+        body.appendChild(cursor)
+
+        var meta = document.createElement('div')
+        meta.className = 'message-meta'
+
+        bubble.appendChild(body)
+        bubble.appendChild(meta)
+        row.appendChild(bubble)
+        els.messages.appendChild(row)
+        scrollMessages()
+
+        return {
+          row: row, bubble: bubble, text: textSpan,
+          cursor: cursor, meta: meta, content: text || ''
+        }
+      }
+
+      function setMessageText(message, text) {
+        message.content = text || ''
+        message.text.textContent = message.content
+      }
+
+      function setMessageStreaming(message, active) {
+        message.cursor.classList.toggle('hidden', !active)
+      }
+
+      /* ─── Event listeners ───────────────────────────────────────────────── */
+
+      async function ensureListeners() {
+        if (state.listenersAttached || !state.LLM) return
+        await state.LLM.addListener('inferenceToken', function (event) {
+          if (event.modelId !== state.modelId || !state.activeAssistant) return
+          setMessageText(state.activeAssistant, state.activeAssistant.content + event.token)
+          setMessageStreaming(state.activeAssistant, true)
+          scrollMessages()
+        })
+
+        await state.LLM.addListener('inferenceComplete', function (event) {
+          if (event.modelId !== state.modelId) return
+          if (!state.activeAssistant && !state.pendingGeneration) return
+
+          var text = typeof event.text === 'string'
+            ? event.text
+            : state.activeAssistant ? state.activeAssistant.content : ''
+
+          if (state.activeAssistant) {
+            setMessageText(state.activeAssistant, text)
+            setMessageStreaming(state.activeAssistant, false)
+            applyCompletionMeta(state.activeAssistant, event)
+          }
+
+          if (text) state.chatHistory.push({ role: 'assistant', content: text })
+
+          state.isGenerating = false
+          state.lastCompletion = event
+          state.activeAssistant = null
+          setStatus('ready', 'Ready')
+          updatePrimaryAction()
+          scrollMessages()
+
+          if (state.pendingGeneration) {
+            state.pendingGeneration.resolve(event)
+            state.pendingGeneration = null
+          }
+        })
+
+        await state.LLM.addListener('inferenceFailed', function (event) {
+          if (event.modelId !== state.modelId) return
+          if (!state.activeAssistant && !state.pendingGeneration) return
+          handleGenerationFailure(event.error || 'Inference failed')
+        })
+
+        state.listenersAttached = true
+      }
+
+      function handleGenerationFailure(message) {
+        state.isGenerating = false
+        setStatus('error', 'Generation failed')
+        updatePrimaryAction()
+
+        if (state.activeAssistant) {
+          state.activeAssistant.row.className = 'message-row error'
+          setMessageText(state.activeAssistant, state.activeAssistant.content || ('Error: ' + message))
+          setMessageStreaming(state.activeAssistant, false)
+          applyErrorMeta(state.activeAssistant, message)
+        } else {
+          var errorMessage = addMessage('error', 'Error: ' + message)
+          applyErrorMeta(errorMessage, message)
+        }
+
+        scrollMessages()
+
+        if (state.pendingGeneration) {
+          state.pendingGeneration.reject(new Error(message))
+          state.pendingGeneration = null
+        }
+        state.activeAssistant = null
+      }
+
+      /* ─── Bridge ────────────────────────────────────────────────────────── */
+
+      async function waitForBridge() {
+        for (var i = 0; i < 50; i++) {
+          if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LLM) {
+            return window.Capacitor.Plugins.LLM
+          }
+          await sleep(200)
+        }
+        throw new Error('LLM plugin not found after 10s')
+      }
+
+      /* ─── Download ──────────────────────────────────────────────────────── */
+
+      async function checkModelExists() {
+        if (!state.Filesystem) return false
+        try {
+          var stat = await state.Filesystem.stat({
+            path: GGUF_NAME,
+            directory: 'DOCUMENTS'
+          })
+          return stat && stat.size > 1000000000
+        } catch (_e) {
+          return false
+        }
+      }
+
+      async function resolveModelAbsolutePath() {
+        var uriResult = await state.Filesystem.getUri({
+          path: GGUF_NAME,
+          directory: 'DOCUMENTS'
+        })
+        return uriResult.uri.replace('file://', '')
+      }
+
+      async function downloadModel() {
+        setDownloadBtnState(true, 'Downloading...')
+        setDownloadStatus('loading', 'Connecting...')
+        els.progressContainer.classList.remove('hidden')
+
+        var progressListener = null
+        try {
+          // Listen for progress events via Filesystem plugin
+          progressListener = await state.Filesystem.addListener('progress', function (event) {
+            state.totalBytes = event.contentLength || 0
+            state.downloadedBytes = event.bytes || 0
+            if (state.totalBytes > 0) {
+              state.downloadProgress = Math.round((state.downloadedBytes / state.totalBytes) * 100)
+            }
+            updateProgressUI()
+            setDownloadStatus('loading', 'Downloading...')
+          })
+
+          // Stream download to disk via native Filesystem.downloadFile()
+          await state.Filesystem.downloadFile({
+            url: GGUF_URL,
+            path: GGUF_NAME,
+            directory: 'DOCUMENTS',
+            progress: true,
+            recursive: true
+          })
+
+          state.downloadProgress = 100
+          updateProgressUI()
+          setDownloadStatus('ready', 'Download complete')
+          setDownloadBtnState(true, 'Loading model...')
+
+        } catch (error) {
+          setDownloadError(error.message || 'Download failed')
+          throw error
+        } finally {
+          if (progressListener) progressListener.remove()
+        }
+      }
+
+      /* ─── Model loading ─────────────────────────────────────────────────── */
+
+      async function loadModelFromPath(absolutePath) {
+        state.modelLoading = true
+
+        try {
+          var result = await state.LLM.loadModel({
+            descriptor: { id: 'qwen3.5', format: MODEL_FORMAT, url: absolutePath },
+            config: { contextSize: 512, nGpuLayers: -1 }
+          })
+
+          state.modelId = result.modelId
+          state.metadata = result.metadata || {}
+          state.chatHistory = [
+            { role: 'system', content: 'You are a helpful, concise assistant. Keep responses brief and to the point.' }
+          ]
+          state.modelLoading = false
+          return result
+        } catch (error) {
+          state.modelLoading = false
+          throw error
+        }
+      }
+
+      /* ─── Screen transition ─────────────────────────────────────────────── */
+
+      async function transitionToChat() {
+        els.downloadScreen.style.opacity = '0'
+        els.downloadScreen.style.transform = 'translateY(-12px)'
+        await sleep(350)
+        els.downloadScreen.classList.add('hidden')
+
+        els.chatUi.classList.remove('hidden')
+        els.chatUi.style.opacity = '0'
+        els.chatUi.style.transform = 'translateY(12px)'
+
+        requestAnimationFrame(function () {
+          els.chatUi.style.opacity = '1'
+          els.chatUi.style.transform = 'translateY(0)'
+        })
+
+        setModelLabel(state.metadata.name || state.modelId)
+        setComposerEnabled(true)
+        setStatus('ready', 'Ready')
+      }
+
+      /* ─── Download + Load combined flow ─────────────────────────────────── */
+
+      async function downloadAndLoad() {
+        try {
+          await downloadModel()
+          var absolutePath = await resolveModelAbsolutePath()
+          MODEL_PATH = absolutePath
+          setDownloadStatus('loading', 'Loading model...')
+          await loadModelFromPath(absolutePath)
+          await transitionToChat()
+        } catch (error) {
+          setDownloadError(error.message || 'Failed')
+          throw error
+        }
+      }
+
+      async function loadExistingModel() {
+        try {
+          var absolutePath = MODEL_PATH || await resolveModelAbsolutePath()
+          MODEL_PATH = absolutePath
+          setDownloadBtnState(true, 'Loading model...')
+          setDownloadStatus('loading', 'Loading model...')
+          await loadModelFromPath(absolutePath)
+          await transitionToChat()
+        } catch (error) {
+          setDownloadError(error.message || 'Load failed')
+          throw error
+        }
+      }
+
+      /* ─── Chat functions ────────────────────────────────────────────────── */
+
+      async function buildPrompt() {
+        if (!state.chatHistory.length) return ''
+        if (state.LLM.applyTemplate) {
+          try {
+            var templated = await state.LLM.applyTemplate({
+              modelId: state.modelId,
+              messages: state.chatHistory,
+              addGenerationPrompt: true
+            })
+            if (templated && templated.prompt) return templated.prompt
+          } catch (_e) {
+            console.warn('applyTemplate failed, using fallback:', _e)
+          }
+        }
+        var lines = []
+        for (var i = 0; i < state.chatHistory.length; i++) {
+          var m = state.chatHistory[i]
+          var name = m.role === 'assistant' ? 'Assistant' : m.role === 'system' ? 'System' : 'User'
+          lines.push(name + ': ' + m.content)
+        }
+        lines.push('Assistant:')
+        return lines.join('\n\n')
+      }
+
+      async function sendPrompt(prompt, options) {
+        options = options || {}
+        if (state.isGenerating) throw new Error('Generation already in progress')
+
+        var messageText = (prompt == null ? els.promptInput.value : prompt).trim()
+        if (!messageText) return null
+
+        var userMessage = addMessage('user', messageText)
+        clearMessageMeta(userMessage)
+        state.chatHistory.push({ role: 'user', content: messageText })
+
+        if (prompt == null || options.clearInput !== false) {
+          els.promptInput.value = ''
+          autoResizeTextarea()
+        }
+
+        state.activeAssistant = addMessage('assistant', '')
+        setMessageStreaming(state.activeAssistant, true)
+        clearMessageMeta(state.activeAssistant)
+        state.isGenerating = true
+        state.lastCompletion = null
+        state.pendingGeneration = createDeferred()
+        setStatus('generating', 'Generating...')
+        updatePrimaryAction()
+        scrollMessages()
+
+        try {
+          var compiledPrompt = await buildPrompt()
+          await state.LLM.streamGenerate({
+            modelId: state.modelId,
+            prompt: compiledPrompt,
+            maxTokens: options.maxTokens || state.defaultMaxTokens,
+            stopSequences: options.stopSequences || ['<|im_end|>'],
+            sampler: options.sampler || { temperature: 0.7, topP: 0.9 }
+          })
+        } catch (error) {
+          handleGenerationFailure(error.message || 'Inference failed')
+          throw error
+        }
+
+        return state.pendingGeneration
+          ? state.pendingGeneration.promise
+          : Promise.resolve(state.lastCompletion)
+      }
+
+      async function handleStop() {
+        if (!state.isGenerating || !state.modelId) return
+        setStatus('loading', 'Stopping...')
+        try {
+          await state.LLM.cancelGeneration({ modelId: state.modelId })
+        } catch (error) {
+          handleGenerationFailure(error.message || 'Failed to stop generation')
+          throw error
+        }
+      }
+
+      /* ─── Event binding ─────────────────────────────────────────────────── */
+
+      function bindChatEvents() {
+        els.promptInput.addEventListener('input', function () {
+          autoResizeTextarea()
+          updatePrimaryAction()
+        })
+
+        els.promptInput.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault()
+            if (!state.isGenerating) {
+              sendPrompt().catch(function (e) { console.error('sendPrompt failed:', e) })
+            }
+          }
+        })
+
+        els.primaryAction.addEventListener('click', function () {
+          if (state.isGenerating) {
+            handleStop().catch(function (e) { console.error('cancel failed:', e) })
+            return
+          }
+          sendPrompt().catch(function (e) { console.error('sendPrompt failed:', e) })
+        })
+      }
+
+      function bindDownloadEvents() {
+        els.downloadBtn.addEventListener('click', function () {
+          downloadAndLoad().catch(function (e) { console.error('downloadAndLoad failed:', e) })
+        })
+      }
+
+      /* ─── Test harness ──────────────────────────────────────────────────── */
+
+      function renderTest(name) {
+        // No visual test panel — tests run silently over the chat UI
+        return { className: '', querySelector: function () { return { textContent: '' } } }
+      }
+
+      async function postJson(path, payload) {
+        try {
+          await fetch(RUNNER_URL + path, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            keepalive: true
+          })
+        } catch (_e) {}
+      }
+
+      async function postResult(id, status, detail, error) {
+        await postJson('/__llm_result', { id: id, status: status, detail: detail, error: error })
+      }
+
+      async function postDone(passed, failed, total, fatal) {
+        await postJson('/__llm_done', { passed: passed, failed: failed, total: total, fatal: fatal })
+      }
+
+      function assert(condition, message) {
+        if (!condition) throw new Error('Assertion failed: ' + message)
+      }
+
+      function eq(actual, expected, message) {
+        if (actual !== expected) {
+          throw new Error(message + ': expected ' + JSON.stringify(expected) + ', got ' + JSON.stringify(actual))
+        }
+      }
+
+      function lastOf(nodeList) { return nodeList[nodeList.length - 1] }
+
+      function simulateType(text) {
+        els.promptInput.value = text
+        els.promptInput.dispatchEvent(new Event('input', { bubbles: true }))
+      }
+
+      function simulateClick(el) { el.click() }
+
+      async function waitFor(conditionFn, timeoutMs, desc) {
+        var deadline = Date.now() + (timeoutMs || 10000)
+        while (Date.now() < deadline) {
+          if (conditionFn()) return true
+          await sleep(50)
+        }
+        throw new Error('waitFor timed out: ' + (desc || ''))
+      }
+
+      async function runTests() {
+        var passed = 0
+        var failed = 0
+        var total = 0
+
+        async function t(name, fn, timeoutMs) {
+          total++
+
+          var startedAt = Date.now()
+          var limit = timeoutMs || 120000
+
+          try {
+            await Promise.race([
+              fn(),
+              new Promise(function (_resolve, reject) {
+                setTimeout(function () { reject(new Error('Timed out after ' + limit + 'ms')) }, limit)
+              })
+            ])
+            passed++
+            await postResult(name, 'pass', (Date.now() - startedAt) + 'ms')
+          } catch (error) {
+            failed++
+            await postResult(name, 'fail', null, (error.message || String(error)).split('\n')[0])
+          }
+        }
+
+        try {
+          // 1.1 Download or detect model
+          await t('1.1 model available', async function () {
+            if (SKIP_DOWNLOAD || MODEL_PATH) {
+              // Model pre-pushed by e2e script
+              assert(MODEL_PATH, 'MODEL_PATH must be set when SKIP_DOWNLOAD is true')
+            } else {
+              var exists = await checkModelExists()
+              if (!exists) {
+                await downloadModel()
+              }
+              MODEL_PATH = await resolveModelAbsolutePath()
+            }
+            assert(MODEL_PATH, 'MODEL_PATH must be resolved')
+          }, 600000)
+
+          // 1.2 Load model
+          await t('1.2 loadModel', async function () {
+            await loadModelFromPath(MODEL_PATH)
+            assert(state.modelId, 'modelId must be set')
+            assert(state.metadata, 'metadata must exist')
+          }, 60000)
+
+          // Show chat UI for interactive tests
+          els.downloadScreen.classList.add('hidden')
+          els.chatUi.classList.remove('hidden')
+          setModelLabel(state.metadata.name || state.modelId)
+          setComposerEnabled(true)
+          setStatus('ready', 'Ready')
+
+          var isAndroid = MODEL_PATH.indexOf('/data/local/tmp/') === 0
+          state.defaultMaxTokens = isAndroid ? 16 : 64
+          state.chatHistory = [
+            { role: 'system', content: 'You are a concise assistant. Always reply in 1-2 short sentences.' }
+          ]
+
+          // 2.1 Send message
+          await t('2.1 send message', async function () {
+            simulateType('Hello from the sample test')
+            assert(!els.primaryAction.disabled, 'send button should be enabled with text')
+
+            var userBefore = els.messages.querySelectorAll('.message-row.user').length
+            simulateClick(els.primaryAction)
+
+            await waitFor(function () {
+              return els.messages.querySelectorAll('.message-row.user').length > userBefore
+            }, 5000, 'user row appeared')
+
+            await waitFor(function () { return !state.isGenerating }, 180000, 'generation complete')
+          }, 180000)
+
+          // 2.2 Streaming cursor
+          await t('2.2 streaming cursor', async function () {
+            state.chatHistory = []
+            var cursorSeen = false
+            var cursorPoll = setInterval(function () {
+              if (els.messages.querySelector('.streaming-cursor:not(.hidden)')) cursorSeen = true
+            }, 20)
+
+            simulateType('Count to five')
+            simulateClick(els.primaryAction)
+
+            await waitFor(function () { return state.isGenerating }, 10000, 'generation started')
+            await waitFor(function () { return !state.isGenerating }, 180000, 'generation complete')
+            clearInterval(cursorPoll)
+
+            assert(cursorSeen, 'streaming cursor should have been visible during streaming')
+            var afterCursor = els.messages.querySelector('.streaming-cursor:not(.hidden)')
+            assert(!afterCursor, 'cursor should be hidden after completion')
+          }, 180000)
+
+          // 2.3 TPS badge
+          await t('2.3 TPS badge', async function () {
+            var assistantRows = els.messages.querySelectorAll('.message-row.assistant')
+            var lastAssistant = lastOf(assistantRows)
+            assert(lastAssistant.querySelector('.badge.success'), 'TPS badge should be present')
+          })
+
+          // 2.4 Token count badge
+          await t('2.4 token count badge', async function () {
+            var assistantRows = els.messages.querySelectorAll('.message-row.assistant')
+            var lastAssistant = lastOf(assistantRows)
+            assert(lastAssistant.querySelector('.badge.info'), 'token count badge should be present')
+          })
+
+          // 2.5 Stop button
+          await t('2.5 stop button cancels', async function () {
+            state.chatHistory = [
+              { role: 'system', content: 'You are a helpful, concise assistant. Keep responses brief and to the point.' }
+            ]
+            var savedMax = state.defaultMaxTokens
+            state.defaultMaxTokens = 2000
+            simulateType('Write a very long detailed story about dragons and kingdoms')
+
+            var stopClicked = false
+            simulateClick(els.primaryAction)
+
+            await waitFor(function () { return state.isGenerating }, 10000, 'generation started')
+
+            // Wait for some tokens to arrive before clicking stop
+            await sleep(2000)
+
+            await waitFor(function () {
+              if (!stopClicked && els.primaryAction.classList.contains('stop')) {
+                simulateClick(els.primaryAction)
+                stopClicked = true
+              }
+              return stopClicked || !state.isGenerating
+            }, 120000, 'stop clicked or generation ended')
+
+            if (state.isGenerating && state.modelId) {
+              try { await state.LLM.cancelGeneration({ modelId: state.modelId }) } catch (_e) {}
+            }
+
+            try {
+              await waitFor(function () { return !state.isGenerating }, 15000, 'generation stopped')
+            } catch (_e) {
+              // Force cleanup if cancel didn't trigger completion event
+              state.isGenerating = false
+              if (state.pendingGeneration) {
+                state.pendingGeneration.reject(new Error('forced cleanup'))
+                state.pendingGeneration = null
+              }
+              state.activeAssistant = null
+              await sleep(1000)
+            }
+
+            state.defaultMaxTokens = savedMax
+
+            var assistantRows = els.messages.querySelectorAll('.message-row.assistant')
+            var lastAssistant = lastOf(assistantRows)
+            var badges = lastAssistant.querySelectorAll('.badge')
+            // Accept any badge as proof that the generation ended
+            assert(badges.length > 0, 'should show at least one completion/status badge')
+          }, 300000)
+
+          // 2.6 Multi-turn
+          await t('2.6 multi-turn conversation', async function () {
+            // Thorough cleanup from previous test
+            if (state.isGenerating && state.modelId) {
+              try { await state.LLM.cancelGeneration({ modelId: state.modelId }) } catch (_e) {}
+              try { await waitFor(function () { return !state.isGenerating }, 10000, 'cleanup') } catch (_e) {}
+            }
+            state.isGenerating = false
+            if (state.pendingGeneration) {
+              try { state.pendingGeneration.reject(new Error('cleanup')) } catch (_e) {}
+              state.pendingGeneration = null
+            }
+            state.activeAssistant = null
+            state.lastCompletion = null
+            state.chatHistory = [
+              { role: 'system', content: 'You are a helpful, concise assistant. Keep responses brief and to the point.' }
+            ]
+            updatePrimaryAction()
+            await sleep(500)
+
+            var userBefore = els.messages.querySelectorAll('.message-row.user').length
+            var assistantBefore = els.messages.querySelectorAll('.message-row.assistant').length
+
+            // Turn 1
+            simulateType('What is 2+2?')
+            simulateClick(els.primaryAction)
+            await waitFor(function () { return state.isGenerating }, 10000, 'turn 1 started')
+            await waitFor(function () { return !state.isGenerating }, 180000, 'turn 1 complete')
+
+            await sleep(500)
+
+            // Turn 2
+            simulateType('And what about 3+3?')
+            await waitFor(function () {
+              return !els.primaryAction.disabled && !els.primaryAction.classList.contains('stop')
+            }, 10000, 'Send button enabled for turn 2')
+            simulateClick(els.primaryAction)
+            await waitFor(function () { return state.isGenerating }, 10000, 'turn 2 started')
+            await waitFor(function () { return !state.isGenerating }, 180000, 'turn 2 complete')
+
+            var userAfter = els.messages.querySelectorAll('.message-row.user').length
+            var assistantAfter = els.messages.querySelectorAll('.message-row.assistant').length
+
+            assert(userAfter >= userBefore + 2, 'should have 2 new user rows')
+            assert(assistantAfter >= assistantBefore + 2, 'should have 2 new assistant rows')
+            // chatHistory includes system prompt, so at least 5 entries (system + 2 user + 2 assistant)
+            assert(state.chatHistory.length >= 5, 'chat history should have at least 5 entries')
+          }, 420000)
+
+          // 2.7 Input state management
+          await t('2.7 input state management', async function () {
+            if (state.isGenerating && state.modelId) {
+              try { await state.LLM.cancelGeneration({ modelId: state.modelId }) } catch (_e) {}
+              await waitFor(function () { return !state.isGenerating }, 60000, 'cleanup cancel')
+            }
+            state.chatHistory = []
+            state.lastCompletion = null
+            updatePrimaryAction()
+
+            assert(!els.promptInput.disabled, 'input should be enabled when model is loaded')
+
+            simulateType('')
+            assert(els.primaryAction.disabled, 'send button should be disabled when input is empty')
+
+            simulateType('test input')
+            assert(!els.primaryAction.disabled, 'send button should be enabled when input has text')
+
+            simulateClick(els.primaryAction)
+            await waitFor(function () { return state.isGenerating }, 10000, 'generation started')
+
+            assert(els.primaryAction.classList.contains('stop'), 'button should have stop class during generation')
+
+            await waitFor(function () { return !state.isGenerating }, 120000, 'generation complete')
+
+            assert(!els.primaryAction.classList.contains('stop'), 'button should not have stop class after generation')
+          }, 180000)
+
+          // 3.1 Unload
+          await t('3.1 unloadModel', async function () {
+            var unloadedModelId = state.modelId
+            await state.LLM.unloadModel({ modelId: state.modelId })
+            state.modelId = null
+            state.metadata = null
+            var list = await state.LLM.listLoadedModels()
+            assert(!list.modelIds.includes(unloadedModelId), 'model must be removed')
+          }, 30000)
+
+          console.log('[e2e] Done: ' + passed + '/' + total + ' passed' + (failed ? ', ' + failed + ' failed' : ''))
+          setStatus(failed === 0 ? 'ready' : 'error', 'Done: ' + passed + '/' + total + ' passed')
+          await state.LLM.removeAllListeners()
+          await postDone(passed, failed, total)
+        } catch (error) {
+          console.error('[e2e] Fatal error:', error)
+          setStatus('error', 'Fatal error')
+          await postResult('FATAL', 'fail', null, error.message)
+          await postDone(passed, failed + 1, total + 1, error.message)
+        }
+      }
+
+      /* ─── Boot ──────────────────────────────────────────────────────────── */
+
+      async function boot() {
+        cacheEls()
+        bindChatEvents()
+        autoResizeTextarea()
+
+        if (TEST_MODE) {
+          els.downloadScreen.classList.add('hidden')
+          els.chatUi.classList.remove('hidden')
+        }
+
+        try {
+          state.LLM = await waitForBridge()
+          state.Filesystem = window.Capacitor.Plugins.Filesystem || null
+          state.bridgeReady = true
+          await ensureListeners()
+        } catch (error) {
+          console.error('boot failed:', error)
+          if (TEST_MODE) {
+            console.error('[e2e] Fatal error: ' + error.message)
+            await postResult('FATAL', 'fail', null, error.message)
+            await postDone(0, 1, 1, error.message)
+          } else {
+            setDownloadError('Bridge unavailable: ' + error.message)
+          }
+          return
+        }
+
+        // TEST_MODE or SKIP_DOWNLOAD: go straight to load
+        if (TEST_MODE) {
+          await runTests()
+          return
+        }
+
+        if (SKIP_DOWNLOAD && MODEL_PATH) {
+          await loadExistingModel()
+          return
+        }
+
+        // Check if model is already on device
+        var exists = await checkModelExists()
+        if (exists) {
+          await loadExistingModel()
+          return
+        }
+
+        // Show download screen, enable button
+        els.downloadBtn.disabled = false
+        els.downloadBtnLabel.textContent = 'Download Model'
+        bindDownloadEvents()
+      }
+
+      window.__llmSampleApp = {
+        boot: boot,
+        getState: function () {
+          return {
+            bridgeReady: state.bridgeReady,
+            modelId: state.modelId,
+            isGenerating: state.isGenerating,
+            messageCount: els.messages ? els.messages.children.length : 0
+          }
+        }
+      }
+
+      cacheEls()
+      boot()
+    })()
+  </script>
+</body>
+</html>

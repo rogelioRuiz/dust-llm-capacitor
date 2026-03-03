@@ -1,0 +1,9 @@
+{
+  "appId": "io.t6x.llmchat.sample",
+  "appName": "LLM Sample",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": true
+  },
+  "loggingBehavior": "debug"
+}

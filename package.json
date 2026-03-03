@@ -21,6 +21,8 @@
     "test:ios:verbose": "npm run build && cd example && npm install && node test-e2e-ios.mjs --verbose",
     "test:android": "npm run build && cd example && npm install && node test-e2e-android.mjs --verbose",
     "test:android:verbose": "npm run build && cd example && npm install && node test-e2e-android.mjs --verbose",
+    "test:ios:sample": "npm run build && cd sample && npm install && node test-e2e-ios.mjs --verbose",
+    "test:android:sample": "npm run build && cd sample && npm install && node test-e2e-android.mjs --verbose",
     "prepublishOnly": "npm run build"
   },
   "capacitor": {
