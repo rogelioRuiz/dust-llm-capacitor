@@ -8,12 +8,12 @@
 
 <p align="center">
   <strong>Device Unified Serving Toolkit</strong><br>
-  <a href="https://github.com/rogelioRuiz/dust">dust ecosystem</a> · v0.1.0 · Apache 2.0
+  <a href="https://github.com/rogelioRuiz/dust">dust ecosystem</a> · v0.2.1 · Apache 2.0
 </p>
 
 <p align="center">
   <a href="https://github.com/rogelioRuiz/dust/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/badge/License-Apache_2.0-blue.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-0.1.0-informational">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.2.0-informational">
   <img alt="npm" src="https://img.shields.io/badge/npm-dust--llm--capacitor-cb3837">
   <img alt="Capacitor" src="https://img.shields.io/badge/Capacitor-7%20%7C%208-119EFF">
   <img alt="GGUF" src="https://img.shields.io/badge/GGUF-llama.cpp-blueviolet">
@@ -97,7 +97,7 @@ dust-llm-capacitor/
 ├── ios/Sources/LLMPlugin/
 │   └── LLMPlugin.swift          # CAPPlugin bridge — 14 @objc methods, DustCore registry, memory warnings
 ├── android/
-│   ├── build.gradle             # depends on io.t6x.dust:dust-llm-kotlin:0.1.0
+│   ├── build.gradle             # depends on io.t6x.dust:dust-llm-kotlin:0.2.0
 │   └── src/main/java/io/t6x/dust/capacitor/llm/
 │       └── LLMPlugin.kt         # @CapacitorPlugin bridge — 14 @PluginMethod functions, coroutines, memory pressure
 └── test/
@@ -331,7 +331,7 @@ xcodebuild build \
 
 The Android module depends on `project(':capacitor-android')` and `project(':capacitor-core')`, which are resolved by the host Capacitor app's `settings.gradle`. This means the Android module **cannot be built standalone** — it must be built as part of a Capacitor app.
 
-Native dependencies (`io.t6x.dust:dust-llm-kotlin:0.1.0`, `io.t6x.dust:dust-core-kotlin:0.1.0`) are fetched from Maven Central automatically.
+Native dependencies (`io.t6x.dust:dust-llm-kotlin:0.2.0`, `io.t6x.dust:dust-core-kotlin:0.1.0`) are fetched from Maven Central automatically.
 
 To build in the context of a Capacitor app:
 
@@ -347,7 +347,7 @@ cd android
 
 Tests for the inference engine, session management, chat templates, and vision support live in the native libraries:
 
-- **iOS tests:** [dust-llm-swift](https://github.com/rogelioRuiz/dust-llm-swift) — 50 XCTests (48 passing, 2 skipped)
+- **iOS tests:** [dust-llm-swift](https://github.com/rogelioRuiz/dust-llm-swift) — 51 XCTests (49 passing, 2 skipped)
 - **Android tests:** [dust-llm-kotlin](https://github.com/rogelioRuiz/dust-llm-kotlin) — 52 JUnit tests (50 passing, 2 skipped)
 
 ### TypeScript checks
@@ -360,7 +360,7 @@ npm run typecheck   # tsc --noEmit
 
 ## Example app & E2E tests
 
-The `example/` directory contains **LLM Chat** — a full interactive chat app that doubles as the E2E test suite (14 in-app tests covering model loading, streaming, cancellation, stop sequences, and multi-turn chat UI).
+The `example/` directory contains **LLM Chat** — a full interactive chat app that doubles as the E2E test suite (14 in-app tests covering model loading, streaming, cancellation, stop sequences, and multi-turn chat UI). The full test runner validates 23 checks on iOS and 21 on Android (including setup, build, and install steps).
 
 ### Quick start
 
@@ -567,7 +567,7 @@ Follow the same steps as above — `adb push` for Android, `cp` into the simulat
 | iOS | [dust-llm-swift](https://github.com/rogelioRuiz/dust-llm-swift) | SPM (`branch: "main"` — unsafeFlags restriction) |
 | iOS | [dust-core-swift](https://github.com/rogelioRuiz/dust-core-swift) | SPM (`from: "0.1.0"`) |
 | iOS | [dust-core-capacitor](https://github.com/rogelioRuiz/dust-core-capacitor) | SPM (`from: "0.1.0"`) |
-| Android | [dust-llm-kotlin](https://github.com/rogelioRuiz/dust-llm-kotlin) | Maven Central (`io.t6x.dust:dust-llm-kotlin:0.1.0`) |
+| Android | [dust-llm-kotlin](https://github.com/rogelioRuiz/dust-llm-kotlin) | Maven Central (`io.t6x.dust:dust-llm-kotlin:0.2.0`) |
 | Android | dust-core-kotlin | Transitive via dust-llm-kotlin |
 
 ## Platform differences
