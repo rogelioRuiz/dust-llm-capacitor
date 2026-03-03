@@ -364,6 +364,20 @@ async function main() {
             cwd: dustLlmSwiftDir, encoding: 'utf8', timeout: 300_000,
             stdio: VERBOSE ? [0, 1, 2] : ['ignore', 'pipe', 'pipe'],
           })
+          // The resolvePackageDependencies step above wrote a build description
+          // (XCBuildData) that recorded llama as a missing target because the
+          // submodule wasn't present yet. Now that it is, delete the stale cache
+          // so xcodebuild regenerates the build graph from scratch.
+          try {
+            const xcbuildDataDir = execSync(
+              `find ~/Library/Developer/Xcode/DerivedData -maxdepth 3 -type d -name "XCBuildData" -path "*/App-*/*" 2>/dev/null | head -1`,
+              { encoding: 'utf8', shell: true }
+            ).trim()
+            if (xcbuildDataDir) {
+              fs.rmSync(xcbuildDataDir, { recursive: true, force: true })
+              console.log('  → Cleared stale XCBuildData cache')
+            }
+          } catch (_e) {}
         }
       }
     } catch (_subErr) {
