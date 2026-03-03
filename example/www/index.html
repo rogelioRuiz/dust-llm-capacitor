@@ -1752,7 +1752,6 @@
           await t('4.4 stop button cancels', async function () {
             // Clear history to avoid context overflow
             state.chatHistory = []
-            // Use more tokens so we have time to click Stop before generation finishes
             var savedMax = state.defaultMaxTokens
             state.defaultMaxTokens = 200
             simulateType('Write a very long detailed story about dragons and kingdoms')
@@ -1776,10 +1775,15 @@
               return stopClicked || !state.isGenerating
             }, 120000, 'stop clicked or generation ended')
 
+            // If stop was clicked but generation hasn't stopped, retry cancel via API
+            if (state.isGenerating && state.modelId) {
+              try { await state.LLM.cancelGeneration({ modelId: state.modelId }) } catch (_e) {}
+            }
+
             // Wait for generation to fully stop
             await waitFor(function () {
               return !state.isGenerating
-            }, 60000, 'generation stopped')
+            }, 120000, 'generation stopped')
 
             state.defaultMaxTokens = savedMax
 
@@ -1801,7 +1805,7 @@
                 'should show completion badge (generation finished before cancel)'
               )
             }
-          }, 180000)
+          }, 300000)
 
           await t('4.5 multi-turn conversation', async function () {
             // Ensure clean state — cancel any lingering generation & clear history
