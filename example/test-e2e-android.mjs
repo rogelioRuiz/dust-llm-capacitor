@@ -96,15 +96,24 @@ function findEmulatorBinary() {
   return null
 }
 
-function findAdbBinary() {
-  if (process.env.ADB_PATH && fs.existsSync(process.env.ADB_PATH)) return process.env.ADB_PATH
+function findAndroidSdkRoot() {
   const candidates = [
-    process.env.ANDROID_HOME && path.join(process.env.ANDROID_HOME, 'platform-tools/adb'),
-    process.env.ANDROID_SDK_ROOT && path.join(process.env.ANDROID_SDK_ROOT, 'platform-tools/adb'),
-    path.join(process.env.HOME, 'Library/Android/sdk/platform-tools/adb'),   // macOS default
-    path.join(process.env.HOME, 'Android/Sdk/platform-tools/adb'),           // Linux default
+    process.env.ANDROID_HOME,
+    process.env.ANDROID_SDK_ROOT,
+    path.join(process.env.HOME, 'Library/Android/sdk'),   // macOS default
+    path.join(process.env.HOME, 'Android/Sdk'),           // Linux default
   ].filter(Boolean)
   for (const p of candidates) {
+    if (fs.existsSync(path.join(p, 'platform-tools'))) return p
+  }
+  return null
+}
+
+function findAdbBinary() {
+  if (process.env.ADB_PATH && fs.existsSync(process.env.ADB_PATH)) return process.env.ADB_PATH
+  const sdk = findAndroidSdkRoot()
+  if (sdk) {
+    const p = path.join(sdk, 'platform-tools/adb')
     if (fs.existsSync(p)) return p
   }
   try { return execSync('which adb', { encoding: 'utf8' }).trim() } catch {}
@@ -343,6 +352,10 @@ async function main() {
     })
     pass('1.2 Android project synced')
 
+    const sdkRoot = findAndroidSdkRoot()
+    if (sdkRoot) {
+      fs.writeFileSync(path.join(__dirname, 'android/local.properties'), `sdk.dir=${sdkRoot}\n`)
+    }
     console.log('  → Building APK (./gradlew assembleDebug)… (use --verbose for build output)')
     run('./gradlew assembleDebug', { cwd: path.join(__dirname, 'android'), ...(VERBOSE && { stdio: [0, 1, 2] }) })
     if (!fs.existsSync(apkPath)) throw new Error('APK not found after build')
