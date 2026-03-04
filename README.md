@@ -8,12 +8,12 @@
 
 <p align="center">
   <strong>Device Unified Serving Toolkit</strong><br>
-  <a href="https://github.com/rogelioRuiz/dust">dust ecosystem</a> · v0.2.2 · Apache 2.0
+  <a href="https://github.com/rogelioRuiz/dust">dust ecosystem</a> · v0.2.9 · Apache 2.0
 </p>
 
 <p align="center">
   <a href="https://github.com/rogelioRuiz/dust/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/badge/License-Apache_2.0-blue.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-0.2.2-informational">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.2.9-informational">
   <img alt="npm" src="https://img.shields.io/badge/npm-dust--llm--capacitor-cb3837">
   <img alt="Capacitor" src="https://img.shields.io/badge/Capacitor-7%20%7C%208-119EFF">
   <img alt="GGUF" src="https://img.shields.io/badge/GGUF-llama.cpp-blueviolet">
@@ -386,7 +386,7 @@ npm run typecheck   # tsc --noEmit
 
 ## E2E testing
 
-Two test suites validate the full stack — the **sample app** (10 in-app tests) and the **example app** (14 in-app tests covering model loading, streaming, cancellation, stop sequences, and multi-turn chat).
+Three test suites validate the full stack — the **sample app** (10 in-app LLM tests), the **serve test** (10 in-app dust-serve lifecycle tests), and the **example app** (14 in-app tests covering model loading, streaming, cancellation, stop sequences, and multi-turn chat).
 
 ### Sample app tests
 
@@ -408,6 +408,26 @@ node test-e2e-ios.mjs --verbose --skip-download
 
 # iOS MLX (requires physical Apple Silicon device)
 node test-e2e-ios.mjs --verbose --mlx
+```
+
+### Serve lifecycle tests (iOS)
+
+Tests the full dust-serve pipeline: `registerModel` → download with SHA-256 verification → `modelReady` event → `loadModel` via serve path → streaming inference → `unloadModel` → re-register.
+
+```bash
+npm run test:ios:serve        # iOS (requires booted simulator or physical device)
+```
+
+Or step by step:
+
+```bash
+cd sample && npm install
+
+# iOS — app downloads the model itself, runs 10 serve lifecycle tests
+node test-e2e-serve-ios.mjs --verbose
+
+# Force fresh download (deletes cached model from simulator container first)
+node test-e2e-serve-ios.mjs --verbose --clean
 ```
 
 ### Example app tests

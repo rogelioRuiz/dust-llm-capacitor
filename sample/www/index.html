@@ -847,6 +847,7 @@
   <script>
     /* ─── Patchable config (overwritten by e2e scripts) ─────────────────── */
     var TEST_MODE = false
+    var SERVE_TEST_MODE = false
     var MODEL_PATH = ''
     var MODEL_FORMAT = 'gguf'
     var RUNNER_URL = 'http://127.0.0.1:8099'
@@ -1978,6 +1979,143 @@
         }
       }
 
+      /* ─── Serve test harness ────────────────────────────────────────────── */
+
+      async function runServeTests() {
+        var passed = 0
+        var failed = 0
+        var total = 0
+
+        async function t(name, fn, timeoutMs) {
+          total++
+          var startedAt = Date.now()
+          var limit = timeoutMs || 30000
+          try {
+            await Promise.race([
+              fn(),
+              new Promise(function (_resolve, reject) {
+                setTimeout(function () { reject(new Error('Timed out after ' + limit + 'ms')) }, limit)
+              })
+            ])
+            passed++
+            await postResult(name, 'pass', (Date.now() - startedAt) + 'ms')
+          } catch (error) {
+            failed++
+            await postResult(name, 'fail', null, (error && error.message ? error.message : String(error)).split('\n')[0])
+          }
+        }
+
+        try {
+          var servePath = null
+
+          // S.1 Serve plugin available
+          await t('S.1 serve plugin available', async function () {
+            assert(state.Serve !== null, 'Serve plugin must be registered')
+          })
+
+          // S.2 registerModel
+          await t('S.2 registerModel', async function () {
+            await state.Serve.registerModel({ descriptor: GGUF_DESCRIPTOR })
+          })
+
+          // S.3 getModelStatus after register
+          await t('S.3 getModelStatus after register', async function () {
+            var result = await state.Serve.getModelStatus({ modelId: GGUF_MODEL_ID })
+            assert(result && result.status && typeof result.status.kind === 'string', 'status.kind must be a string')
+          })
+
+          // S.4 listModels — returns { models: [{ descriptor, status }] }
+          await t('S.4 listModels', async function () {
+            var result = await state.Serve.listModels()
+            assert(result && Array.isArray(result.models), 'listModels must return models array')
+            var found = result.models.some(function (m) { return m.descriptor && m.descriptor.id === GGUF_MODEL_ID })
+            assert(found, 'models must contain ' + GGUF_MODEL_ID)
+          })
+
+          // S.5 download model — await listeners first, then start download
+          await t('S.5 download model', async function () {
+            var resolveDownload, rejectDownload
+            var downloadPromise = new Promise(function (res, rej) { resolveDownload = res; rejectDownload = rej })
+
+            var readyHandle = await state.Serve.addListener('modelReady', function (event) {
+              if (event.modelId !== GGUF_MODEL_ID) return
+              readyHandle.remove()
+              failedHandle.remove()
+              resolveDownload(event.path)
+            })
+
+            var failedHandle = await state.Serve.addListener('modelFailed', function (event) {
+              if (event.modelId !== GGUF_MODEL_ID) return
+              readyHandle.remove()
+              failedHandle.remove()
+              rejectDownload(new Error((event.error && event.error.detail) || (event.error && event.error.message) || 'Download failed'))
+            })
+
+            state.Serve.downloadModel({ modelId: GGUF_MODEL_ID }).catch(function (e) {
+              rejectDownload(new Error(e && e.message ? e.message : String(e)))
+            })
+
+            servePath = await downloadPromise
+            assert(servePath, 'modelReady event must include a path')
+          }, 900000)
+
+          // S.6 getModelStatus ready — kind is 'ready' (path not exposed via getModelStatus)
+          await t('S.6 getModelStatus ready', async function () {
+            var result = await state.Serve.getModelStatus({ modelId: GGUF_MODEL_ID })
+            assert(result.status.kind === 'ready', 'status.kind must be ready, got: ' + result.status.kind)
+          })
+
+          // S.7 loadModel via path obtained from modelReady event
+          await t('S.7 loadModel via serve path', async function () {
+            assert(servePath, 'servePath must be set from S.5 modelReady event')
+            await loadModelFromPath(servePath)
+            assert(state.modelId, 'modelId must be set after loadModel')
+          }, 60000)
+
+          // S.8 inference using loaded model
+          await t('S.8 inference', async function () {
+            var tokenReceived = false
+            var handle = await state.LLM.addListener('inferenceToken', function (event) {
+              if (event.modelId === state.modelId) tokenReceived = true
+            })
+            try {
+              await state.LLM.streamGenerate({
+                modelId: state.modelId,
+                prompt: 'Hi',
+                maxTokens: 8,
+                sampler: { temperature: 0.0 }
+              })
+            } catch (_e) {}
+            handle.remove()
+            assert(tokenReceived, 'at least one inferenceToken event must be received')
+          }, 60000)
+
+          // S.9 unloadModel
+          await t('S.9 unloadModel', async function () {
+            var unloadedId = state.modelId
+            await state.LLM.unloadModel({ modelId: state.modelId })
+            state.modelId = null
+            state.metadata = null
+            var list = await state.LLM.listLoadedModels()
+            assert(!list.modelIds.includes(unloadedId), 'model must be removed from loaded list')
+          }, 30000)
+
+          // S.10 re-register resets status to notLoaded (file-on-disk restore not yet implemented)
+          await t('S.10 re-register resets status', async function () {
+            await state.Serve.registerModel({ descriptor: GGUF_DESCRIPTOR })
+            var result = await state.Serve.getModelStatus({ modelId: GGUF_MODEL_ID })
+            assert(result.status.kind === 'notLoaded', 'registerModel resets status to notLoaded, got: ' + result.status.kind)
+          })
+
+          await state.LLM.removeAllListeners()
+          await postDone(passed, failed, total)
+        } catch (error) {
+          console.error('[serve-e2e] Fatal error:', error)
+          await postResult('FATAL', 'fail', null, error && error.message ? error.message : String(error))
+          await postDone(passed, failed + 1, total + 1, error && error.message ? error.message : String(error))
+        }
+      }
+
       /* ─── Boot ──────────────────────────────────────────────────────────── */
 
       async function boot() {
@@ -1985,7 +2123,7 @@
         bindChatEvents()
         autoResizeTextarea()
 
-        if (TEST_MODE) {
+        if (TEST_MODE || SERVE_TEST_MODE) {
           els.downloadScreen.classList.add('hidden')
           els.chatUi.classList.remove('hidden')
         }
@@ -1998,13 +2136,19 @@
           await ensureListeners()
         } catch (error) {
           console.error('boot failed:', error)
-          if (TEST_MODE) {
+          if (TEST_MODE || SERVE_TEST_MODE) {
             console.error('[e2e] Fatal error: ' + error.message)
             await postResult('FATAL', 'fail', null, error.message)
             await postDone(0, 1, 1, error.message)
           } else {
             setCardError('gguf', 'Bridge unavailable: ' + error.message)
           }
+          return
+        }
+
+        // SERVE_TEST_MODE: run serve lifecycle tests
+        if (SERVE_TEST_MODE) {
+          await runServeTests()
           return
         }
 

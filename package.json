@@ -1,6 +1,6 @@
 {
   "name": "dust-llm-capacitor",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "description": "Capacitor plugin for on-device llama.cpp model loading over GGUF files.",
   "main": "dist/esm/index.js",
   "types": "dist/esm/index.d.ts",
@@ -23,6 +23,7 @@
     "test:android": "npm run build && cd example && npm install && node test-e2e-android.mjs --verbose",
     "test:android:verbose": "npm run build && cd example && npm install && node test-e2e-android.mjs --verbose",
     "test:ios:sample": "npm run build && cd sample && npm install && node test-e2e-ios.mjs --verbose",
+    "test:ios:serve": "npm run build && cd sample && npm install && node test-e2e-serve-ios.mjs --verbose",
     "test:android:sample": "npm run build && cd sample && npm install && node test-e2e-android.mjs --verbose",
     "launch:ios:sample": "npm run build && cd sample && npm install && node launch-ios.mjs --verbose --open-simulator",
     "prepublishOnly": "npm run build"

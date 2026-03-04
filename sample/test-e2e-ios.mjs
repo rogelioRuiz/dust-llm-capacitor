@@ -320,13 +320,20 @@ function ensureModel() {
 
 function ensureIosPlatform() {
   const iosDir = path.join(__dirname, "ios");
-  if (fs.existsSync(iosDir)) return;
-  console.log("  → cap add ios...");
-  npx("cap add ios", {
-    cwd: __dirname,
-    stdio: VERBOSE ? [0, 1, 2] : ["ignore", "pipe", "pipe"],
-    timeout: 60_000,
-  });
+  const xcodeproj = path.join(__dirname, "ios/App/App.xcodeproj");
+  // Re-add if missing entirely or xcodeproj is gone (broken state after rsync)
+  if (fs.existsSync(iosDir) && !fs.existsSync(xcodeproj)) {
+    console.log("  → iOS dir exists but App.xcodeproj missing — removing and re-adding...");
+    execSync(`rm -rf "${iosDir}"`, { stdio: "ignore" });
+  }
+  if (!fs.existsSync(iosDir)) {
+    console.log("  → cap add ios...");
+    npx("cap add ios", {
+      cwd: __dirname,
+      stdio: VERBOSE ? [0, 1, 2] : ["ignore", "pipe", "pipe"],
+      timeout: 60_000,
+    });
+  }
 }
 
 function fixDeploymentTarget() {

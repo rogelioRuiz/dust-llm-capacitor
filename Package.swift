@@ -14,7 +14,6 @@ let package = Package(
         .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", from: "8.0.0"),
         .package(url: "https://github.com/rogelioRuiz/dust-core-swift.git", from: "0.1.2"),
         .package(url: "https://github.com/rogelioRuiz/dust-llm-swift.git", branch: "main"),
-        .package(url: "https://github.com/rogelioRuiz/dust-serve-capacitor.git", from: "0.1.7"),
     ],
     targets: [
         .target(
@@ -24,7 +23,6 @@ let package = Package(
                 .product(name: "Cordova", package: "capacitor-swift-pm"),
                 .product(name: "DustCore", package: "dust-core-swift"),
                 .product(name: "DustLlm", package: "dust-llm-swift"),
-                .product(name: "DustServeCapacitor", package: "dust-serve-capacitor"),
             ],
             path: "ios/Sources/LLMPlugin"
         ),
