@@ -16,7 +16,7 @@
     "@capacitor/filesystem": "^8.0.0",
     "dust-llm-capacitor": "file:..",
     "dust-core-capacitor": "0.1.3",
-    "dust-serve-capacitor": "0.1.8"
+    "dust-serve-capacitor": "0.1.9"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.1.0"

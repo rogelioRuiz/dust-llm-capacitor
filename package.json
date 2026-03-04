@@ -57,13 +57,13 @@
   "peerDependencies": {
     "@capacitor/core": "^7.0.0 || ^8.0.0",
     "dust-core-capacitor": ">=0.1.3",
-    "dust-serve-capacitor": ">=0.1.8"
+    "dust-serve-capacitor": ">=0.1.9"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.4",
     "@capacitor/core": "^8.0.0",
     "dust-core-capacitor": "^0.1.3",
-    "dust-serve-capacitor": "^0.1.8",
+    "dust-serve-capacitor": "^0.1.9",
     "typescript": "~5.7.0"
   },
   "engines": {
