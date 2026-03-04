@@ -2059,15 +2059,17 @@
             assert(servePath, 'modelReady event must include a path')
           }, 900000)
 
-          // S.6 getModelStatus ready — kind is 'ready' (path not exposed via getModelStatus)
+          // S.6 getModelStatus ready — kind is 'ready' and path is set
           await t('S.6 getModelStatus ready', async function () {
             var result = await state.Serve.getModelStatus({ modelId: GGUF_MODEL_ID })
             assert(result.status.kind === 'ready', 'status.kind must be ready, got: ' + result.status.kind)
+            assert(result.status.path, 'status.path must be set in getModelStatus when ready')
+            servePath = result.status.path
           })
 
-          // S.7 loadModel via path obtained from modelReady event
+          // S.7 loadModel via path from getModelStatus
           await t('S.7 loadModel via serve path', async function () {
-            assert(servePath, 'servePath must be set from S.5 modelReady event')
+            assert(servePath, 'servePath must be set from S.6 getModelStatus')
             await loadModelFromPath(servePath)
             assert(state.modelId, 'modelId must be set after loadModel')
           }, 60000)
@@ -2100,11 +2102,12 @@
             assert(!list.modelIds.includes(unloadedId), 'model must be removed from loaded list')
           }, 30000)
 
-          // S.10 re-register resets status to notLoaded (file-on-disk restore not yet implemented)
-          await t('S.10 re-register resets status', async function () {
+          // S.10 re-register restores ready state from disk (no re-download needed)
+          await t('S.10 re-register restores from disk', async function () {
             await state.Serve.registerModel({ descriptor: GGUF_DESCRIPTOR })
             var result = await state.Serve.getModelStatus({ modelId: GGUF_MODEL_ID })
-            assert(result.status.kind === 'notLoaded', 'registerModel resets status to notLoaded, got: ' + result.status.kind)
+            assert(result.status.kind === 'ready', 'registerModel must restore ready when file exists on disk, got: ' + result.status.kind)
+            assert(result.status.path, 'status.path must be set after disk-restore re-register')
           })
 
           await state.LLM.removeAllListeners()
