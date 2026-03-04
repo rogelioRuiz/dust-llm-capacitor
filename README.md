@@ -69,15 +69,29 @@ This is the **Capacitor bridge layer** — it translates JavaScript API calls in
   </tr>
 </table>
 
-**Run this demo in 3 commands:**
+## Quickstart — Sample app
+
+The `sample/` directory is a standalone chat app with a model download screen and streaming chat UI. It downloads Qwen 3.5 2B (~1.3 GB) on-device and runs inference locally.
 
 ```bash
 git clone https://github.com/rogelioRuiz/dust-llm-capacitor && cd dust-llm-capacitor
-npm install
-npm run test:android   # or: npm run test:ios
+npm install && npm run build
+cd sample && npm install
+
+# iOS — builds, installs, and launches (opens Simulator window)
+node launch-ios.mjs --open-simulator
+
+# iOS — clean start (wipes cached models first)
+node launch-ios.mjs --open-simulator --clean
 ```
 
-> First run downloads the Qwen 3.5 2B model (~1.3 GB) automatically and caches it in `test/models/`.
+Or from the repo root:
+
+```bash
+npm run launch:ios:sample
+```
+
+The app opens on the download screen — tap **Download Model** to fetch the GGUF file, then chat.
 
 ## Install
 
@@ -370,30 +384,43 @@ npm run lint        # biome check
 npm run typecheck   # tsc --noEmit
 ```
 
-## Example app & E2E tests
+## E2E testing
 
-The `example/` directory contains **LLM Chat** — a full interactive chat app that doubles as the E2E test suite (14 in-app tests covering model loading, streaming, cancellation, stop sequences, and multi-turn chat UI). The full test runner validates 23 checks on iOS and 21 on Android (including setup, build, and install steps).
+Two test suites validate the full stack — the **sample app** (10 in-app tests) and the **example app** (14 in-app tests covering model loading, streaming, cancellation, stop sequences, and multi-turn chat).
 
-### Quick start
-
-```bash
-# From repo root — single command
-npm run test:ios       # iOS GGUF (requires booted simulator)
-npm run test:android   # Android GGUF (requires connected device/emulator)
-```
-
-Add `--verbose` for full build output (xcodebuild, gradlew, cap sync):
+### Sample app tests
 
 ```bash
-npm run test:ios:verbose
-npm run test:android:verbose
+npm run test:ios:sample       # iOS (requires booted simulator or physical device)
+npm run test:android:sample   # Android (requires connected device/emulator)
 ```
 
 Or step by step:
 
 ```bash
-npm install && npm run build    # build the plugin
-cd example && npm install       # install example deps
+cd sample && npm install
+
+# iOS — downloads model, builds, runs 10 in-app tests, leaves app running
+node test-e2e-ios.mjs --verbose
+
+# iOS with pre-cached model (faster — skips in-app download)
+node test-e2e-ios.mjs --verbose --skip-download
+
+# iOS MLX (requires physical Apple Silicon device)
+node test-e2e-ios.mjs --verbose --mlx
+```
+
+### Example app tests
+
+```bash
+npm run test:ios       # iOS GGUF
+npm run test:android   # Android GGUF
+```
+
+Or step by step:
+
+```bash
+cd example && npm install
 
 # iOS (GGUF)
 node test-e2e-ios.mjs
@@ -411,12 +438,12 @@ node test-e2e-android.mjs
 
 - Download [Qwen 3.5 2B](https://huggingface.co/unsloth/Qwen3.5-2B-GGUF) Q4_K_M (~1.3 GB) or [Qwen 3.5 2B 8-bit MLX](https://huggingface.co/mlx-community/Qwen3.5-2B-8bit) (~2.6 GB), cached in `test/models/`
 - `cap add ios` / `cap add android` if platform directory is missing
-- iOS: patch deployment target to 16.0 (GGUF) or 17.0 (MLX), SPM resolution
+- iOS: patch deployment target to 17.0, SPM resolution, auto-signing
 - Android: patch Kotlin Gradle plugin, minSdk 28, cleartext HTTP for localhost
 - `cap sync`, native build (`xcodebuild` / `gradlew assembleDebug`)
 - App install, model deployment to simulator/device, HTTP result collection
 
-### Prerequisites
+### Test prerequisites
 
 | | iOS | Android |
 |---|---|---|
@@ -424,90 +451,6 @@ node test-e2e-android.mjs
 | **Runtime** | Auto-boots simulator if needed | Auto-starts emulator if needed |
 | **SDK** | Xcode with at least one iPhone simulator | JDK 17 + Android SDK + at least one AVD |
 | **Node** | >= 20 | >= 20 |
-
-### Interactive mode
-
-Set `TEST_MODE = false` in `example/www/index.html` to use the app as a regular chat interface with the on-device model.
-
-### Running manually (step by step)
-
-If you want full control instead of the one-command E2E scripts, follow these steps.
-
-#### 1. Clone and install
-
-```bash
-git clone https://github.com/rogelioRuiz/dust-llm-capacitor.git
-cd dust-llm-capacitor
-npm install && npm run build
-cd example && npm install
-```
-
-#### 2. Download a GGUF model
-
-The E2E scripts auto-download [Qwen 3.5 2B Q4_K_M](https://huggingface.co/unsloth/Qwen3.5-2B-GGUF) (~1.3 GB). To download it yourself:
-
-```bash
-mkdir -p test/models
-curl -L --progress-bar -o test/models/Qwen3.5-2B-Q4_K_M.gguf \
-  https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf
-```
-
-#### 3a. iOS
-
-```bash
-# Add platform (skip if ios/ already exists)
-npx cap add ios
-npx cap sync ios
-
-# Build
-cd ios/App
-xcodebuild -scheme App -sdk iphonesimulator \
-  -destination 'platform=iOS Simulator,name=iPhone 16' \
-  -configuration Debug build
-cd ../..
-
-# Find the simulator UDID and install the app
-UDID=$(xcrun simctl list devices booted -j | python3 -c "
-import sys, json
-for devs in json.load(sys.stdin)['devices'].values():
-  for d in devs:
-    if d['state']=='Booted': print(d['udid']); break
-" 2>/dev/null | head -1)
-APP=$(find ~/Library/Developer/Xcode/DerivedData -name "App.app" \
-  -path "*Debug-iphonesimulator*" -not -path "*PlugIns*" | head -1)
-xcrun simctl install "$UDID" "$APP"
-
-# Copy the model into the app's Documents folder
-DATA_DIR=$(xcrun simctl get_app_container "$UDID" io.t6x.llmchat data)
-mkdir -p "$DATA_DIR/Documents"
-cp test/models/Qwen3.5-2B-Q4_K_M.gguf "$DATA_DIR/Documents/"
-
-# Patch MODEL_PATH in the installed app to point to the simulator path
-BUNDLE_DIR=$(xcrun simctl get_app_container "$UDID" io.t6x.llmchat)
-sed -i '' "s|var MODEL_PATH = '.*'|var MODEL_PATH = '$DATA_DIR/Documents/Qwen3.5-2B-Q4_K_M.gguf'|" \
-  "$BUNDLE_DIR/public/index.html"
-
-# Launch
-xcrun simctl launch "$UDID" io.t6x.llmchat
-```
-
-#### 3b. Android
-
-```bash
-# Add platform (skip if android/ already exists)
-npx cap add android
-npx cap sync android
-
-# Push model to device (MODEL_PATH in index.html defaults to /data/local/tmp/)
-adb push test/models/Qwen3.5-2B-Q4_K_M.gguf /data/local/tmp/
-
-# Build and install
-cd android && ./gradlew assembleDebug && cd ..
-adb install -r android/app/build/outputs/apk/debug/app-debug.apk
-
-# Launch
-adb shell am start -n io.t6x.llmchat/.MainActivity
-```
 
 ### Using a different model
 
