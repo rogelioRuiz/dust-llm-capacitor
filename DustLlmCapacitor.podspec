@@ -25,6 +25,7 @@ Pod::Spec.new do |s|
 
   s.dependency 'Capacitor'
   s.dependency 'DustCoreCapacitor'
+  s.dependency 'DustServeCapacitor'
   s.dependency 'DustCore'
   s.dependency 'DustLlm'
   s.swift_version = '5.9'

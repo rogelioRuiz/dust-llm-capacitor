@@ -12,9 +12,9 @@ import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
 import io.t6x.dust.llm.*
 import io.t6x.dust.core.DustCoreError
-import io.t6x.dust.core.DustCoreRegistry
 import io.t6x.dust.core.ModelFormat
 import io.t6x.dust.core.SessionPriority
+import io.t6x.dust.capacitor.serve.ServePlugin
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -36,7 +36,8 @@ class LLMPlugin : Plugin(), ComponentCallbacks2 {
         handler = Handler(workerThread.looper)
         dispatcher = handler.asCoroutineDispatcher()
         scope = CoroutineScope(dispatcher + SupervisorJob())
-        DustCoreRegistry.getInstance().registerModelServer(sessionManager)
+        (bridge.pluginManager.getPlugin("Serve")?.plugin as? ServePlugin)
+            ?.setSessionFactory(sessionManager)
         bridge.context.registerComponentCallbacks(this)
     }
 

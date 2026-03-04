@@ -3,6 +3,7 @@ import Foundation
 import DustCore
 @_exported import DustLlm
 import UIKit
+import ServePlugin
 
 @objc(LLMPlugin)
 public class LLMPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -29,7 +30,9 @@ public class LLMPlugin: CAPPlugin, CAPBridgedPlugin {
 
     public override func load() {
         super.load()
-        DustCoreRegistry.shared.register(modelServer: sessionManager)
+        if let servePlugin = bridge?.plugin(withName: "Serve") as? ServePlugin {
+            servePlugin.setSessionFactory(sessionManager)
+        }
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleMemoryWarning),
