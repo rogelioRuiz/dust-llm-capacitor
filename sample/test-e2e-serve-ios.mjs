@@ -309,6 +309,9 @@ function startResultServer() {
         });
       });
 
+      // Kill any stale process holding the port before binding
+      try { run(`lsof -ti:${RUNNER_PORT} | xargs kill -9`, { stdio: 'ignore' }) } catch {}
+
       server.listen(RUNNER_PORT, "0.0.0.0", () => {
         resolveServer({ server, allDonePromise });
       });
