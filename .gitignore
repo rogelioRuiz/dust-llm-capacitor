@@ -27,3 +27,4 @@ test/models/
 **/.kotlin/
 **/__pycache__/
 *.mp4
+.DS_Store
