@@ -2,8 +2,8 @@ import Capacitor
 import Foundation
 import DustCore
 @_exported import DustLlm
+import ServePlugin
 import UIKit
-import DustServeCapacitor
 
 @objc(LLMPlugin)
 public class LLMPlugin: CAPPlugin, CAPBridgedPlugin {
