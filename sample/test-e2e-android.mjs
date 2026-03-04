@@ -159,9 +159,7 @@ function bootEmulator(emulatorBin, avdName) {
 }
 
 function npx(args, opts = {}) {
-  const npmPath = execSync('which npm', { encoding: 'utf8' }).trim()
-  const npxPath = path.join(path.dirname(npmPath), 'npx')
-  return run(`${npxPath} ${args}`, opts)
+  return run(`npx ${args}`, opts)
 }
 
 // ─── Project setup (idempotent) ──────────────────────────────────────────────
