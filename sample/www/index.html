@@ -892,7 +892,7 @@
         activeAssistant: null,
         pendingGeneration: null,
         lastCompletion: null,
-        defaultMaxTokens: 128
+        defaultMaxTokens: 512
       }
 
       var els = {}
@@ -1823,7 +1823,7 @@
           setStatus('ready', 'Ready')
 
           var isAndroid = MODEL_PATH.indexOf('/data/local/tmp/') === 0
-          state.defaultMaxTokens = isAndroid ? 16 : 64
+          state.defaultMaxTokens = isAndroid ? 16 : 512
           state.chatHistory = [
             { role: 'system', content: 'You are a concise assistant. Always reply in 1-2 short sentences.' }
           ]
