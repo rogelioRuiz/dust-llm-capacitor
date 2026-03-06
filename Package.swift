@@ -13,7 +13,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", from: "8.0.0"),
         .package(url: "https://github.com/rogelioRuiz/dust-core-swift.git", from: "0.1.3"),
-        .package(url: "https://github.com/rogelioRuiz/dust-llm-swift.git", branch: "main"),
+        .package(url: "https://github.com/rogelioRuiz/dust-llm-swift.git", revision: "8f6a0c888ee0d3813ad9304993348adfa0490de6"),
     ],
     targets: [
         .target(
