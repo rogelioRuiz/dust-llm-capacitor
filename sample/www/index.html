@@ -871,8 +871,8 @@
     var SKIP_DOWNLOAD = false
     var GGUF_URL = 'https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf'
     var GGUF_NAME = 'Qwen3.5-2B-Q4_K_M.gguf'
-    var MLX_REPO = 'mlx-community/Qwen3.5-2B-8bit'
-    var MLX_MODEL_ID = 'qwen3.5-2b-mlx-8bit'
+    var MLX_REPO = 'mlx-community/Qwen2.5-1.5B-Instruct-4bit'
+    var MLX_MODEL_ID = 'qwen2.5-1.5b-instruct-mlx-4bit'
 
     /* ─── dust-serve GGUF descriptor ─────────────────────────────────────── */
     var GGUF_MODEL_ID = 'qwen3.5-2b-q4km'
@@ -1449,7 +1449,7 @@
 
         return {
           id: MLX_MODEL_ID,
-          name: 'Qwen3.5 2B MLX 8-bit',
+          name: 'Qwen2.5 1.5B Instruct MLX 4-bit',
           format: 'mlx',
           sizeBytes: totalSize,
           version: '1',
