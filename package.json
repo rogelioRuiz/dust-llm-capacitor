@@ -1,6 +1,6 @@
 {
   "name": "dust-llm-capacitor",
-  "version": "0.2.17",
+  "version": "0.2.18",
   "description": "Capacitor plugin for on-device llama.cpp model loading over GGUF files.",
   "main": "dist/esm/index.js",
   "types": "dist/esm/index.d.ts",
